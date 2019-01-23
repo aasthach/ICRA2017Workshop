@@ -22,7 +22,7 @@ Interface:
   controlType: "MAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
-  numSketchPoints: 4
+  numSketchPoints: 10
 
 
   ###Drone Params
