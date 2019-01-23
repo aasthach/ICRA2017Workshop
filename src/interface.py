@@ -10,10 +10,14 @@ and human push/robot pull semantic information
 
 Using Model-View-Controller Architecture
 
+Revamping for actual research
+
 Version History (Sort of):
 0.1.1: added robot movement
 0.1.2: added automatic robot movement
 0.2.0: added POMCP control, data collection, yaml config
+
+
 ***********************************************************
 """
 
