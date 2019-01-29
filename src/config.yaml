@@ -22,8 +22,10 @@ Interface:
   controlType: "MAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
-  numSketchPoints: 10
+  numSketchPoints: 4
 
+  #Radius in pixels of drawn sketch points
+  sketchDensity: 4
 
   ###Drone Params
 
@@ -34,7 +36,9 @@ Interface:
   droneViewRadius: 75
 
   #How often, in Hz, the front end requests a control action, {0.00001-\inf}
-  controlFreq: 3
+  controlFreq: 2
+
+
 
 
 ###Model Params
@@ -42,8 +46,8 @@ Model:
   copInitPose: [200,500]
   targetInitPose: [400,200]
 
-  #Random Beliefs, if belType is None, {1-40}
-  numRandBel: 15
+  #Random Beliefs, if belNum is None, {1-40}
+  numRandBel: 20
 
   #How far in each direction the robot clears fog, also determines
   #catch radius, {1-\inf}
@@ -59,7 +63,13 @@ Model:
   targetSizeRadius: 10
 
   #Number of steps in the comet trail, {0-\inf}
-  breadCrumbLength: 100
+  breadCrumbLength: 50
 
   #Which pre-generated belief to use, {1-10}
   belNum: None
+
+  #Standard Deviation of target position in pixels
+  targetSpeed: 7
+
+  #What governs the movement of the target? {"Stationary","Random","NCV"}
+  targetMovementModel: "NCV"

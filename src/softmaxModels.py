@@ -446,7 +446,7 @@ class Softmax:
 		converged = False
 		EM_step = 0
 
-		while not converged and EM_step < 10000:
+		while not converged and EM_step < 100:
 			################################################################
 			# STEP 1 - EXPECTATION
 			################################################################
@@ -544,7 +544,7 @@ class Softmax:
 			# <>CHECK - WHY DO WE ADD +1 HERE??
 			log_c_hat = y_cs[j] - alpha + sum1 - KLD + 1
 
-			if np.abs(log_c_hat - prev_log_c_hat) < 0.001:
+			if np.abs(log_c_hat - prev_log_c_hat) < 0.1:
 			    break
 
 			prev_log_c_hat = log_c_hat
@@ -809,17 +809,18 @@ class Softmax:
 		#sample a bunch from the prior
 		tmp = GM(); 
 		tmp.addG(Gaussian(prior.mean,prior.var,1)); 
-		tmpSamps = tmp.sample(500);
+		numSamps = 100; 
+		tmpSamps = tmp.sample(numSamps);
 
 		#Find the likelihood at each sampled point
-		probs = np.zeros(500).tolist()
-		for i in range(0,500):
+		probs = np.zeros(numSamps).tolist()
+		for i in range(0,numSamps):
 			if(not inverse):
 				probs[i] = self.pointEvalND(softClass,tmpSamps[i]); 
 			else:
 				probs[i] = 1-self.pointEvalND(softClass,tmpSamps[i]); 
 		#Find the average likelihood, which is the weight factor
-		sumSamp = sum(probs)/500; 
+		sumSamp = sum(probs)/numSamps; 
 
 		#Multiply the sampled weight factor by the previous weight
 		#or add in log space

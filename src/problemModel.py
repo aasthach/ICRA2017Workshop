@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np; 
 
 from interfaceFunctions import distance
+from interfaceFunctions import mahalanobisDistance
 
 class Model:
 
@@ -43,7 +44,10 @@ class Model:
 		self.ROBOT_VIEW_RADIUS = params['Model']['robotViewRadius']; 
 		self.ROBOT_SIZE_RADIUS = params['Model']['robotSizeRadius']; 
 		self.ROBOT_NOMINAL_SPEED = params['Model']['robotNominalSpeed']; 
+		self.TARGET_NOMINAL_SPEED = params['Model']['targetSpeed']; 
 		self.TARGET_SIZE_RADIUS = params['Model']['targetSizeRadius']; 
+
+		self.TARGET_MOVEMENT_MODEL = params['Model']['targetMovementModel']; 
 
 		self.MAX_BELIEF_SIZE = params['Model']['numRandBel']; 
 
@@ -59,7 +63,7 @@ class Model:
 				self.belief = GM(); 
 
 				for i in range(0,self.MAX_BELIEF_SIZE):
-					self.belief.addNewG([np.random.randint(0,437),np.random.randint(0,754)],[[2000+500*np.random.normal(),0],[0,2000+500*np.random.normal()]],np.random.random()); 
+					self.belief.addNewG([np.random.randint(0,437),np.random.randint(0,754)],[[2000+500*np.random.normal(),0],[0,2000+500*np.random.normal()]],np.sqrt(np.random.random())); 
 				self.belief.normalizeWeights(); 
 			else:
 				self.belief = np.load("../models/beliefs{}.npy".format(belModel))[0]
@@ -67,16 +71,21 @@ class Model:
 
 		self.robPose = params['Model']['targetInitPose'];
 		
-		self.bounds = {'low':[0,0],'high':[437,754]}
+		if(self.TARGET_MOVEMENT_MODEL == 'NCV'):
+			self.robPose = [self.robPose[0],self.robPose[1],(np.random.random()*self.TARGET_NOMINAL_SPEED*2 - self.TARGET_NOMINAL_SPEED)**2,(np.random.random()*self.TARGET_NOMINAL_SPEED*2 - self.TARGET_NOMINAL_SPEED)**2]
+
+		self.bounds = {'low':[0,0,-self.TARGET_NOMINAL_SPEED,-self.TARGET_NOMINAL_SPEED],'high':[437,754,self.TARGET_NOMINAL_SPEED,self.TARGET_NOMINAL_SPEED]}
 		
 		self.setupTransitionLayer(); 
 		self.setupCostLayer(); 
 
 		#TODO: Spatial Relations don't always map correctly, fix it....
 		#self.spatialRealtions = {'Near':0,'South of':4,'West of':1,'North of':2,'East of':3}; 
-		self.spatialRealtions = {'Near':0,'South of':1,'West of':2,'North of':3,'East of':4}; 
+		#self.spatialRealtions = {'Near':0,'South of':1,'West of':2,'North of':3,'East of':4}; 
+		self.spatialRealtions = {'Near':0,'South of':3,'West of':4,'North of':1,'East of':2}; 
 
 		self.sketches = {};
+		self.sketchParams = {}; 
 
 		self.prevPoses = []; 
 
@@ -119,9 +128,6 @@ class Model:
 
 
 
-	def distance(self,x,y):
-		return np.sqrt((x[0]-y[0])**2 + (x[1]-y[1])**2); 
-
 
 
 	def makeSketch(self,vertices,name):
@@ -131,6 +137,19 @@ class Model:
 		pz.buildPointsModel(vertices,steepness=2); 
 		self.sketches[name] = pz; 
 
+		cent = [0,0,0,0]; 
+		for i in range(0,len(vertices)):
+			cent[0] += vertices[i][0]/len(vertices); 
+			cent[1] += vertices[i][1]/len(vertices); 
+
+		for i in range(0,len(vertices)):
+			cent[2] = max(cent[2],np.abs(vertices[i][0]-cent[0]))
+			cent[3] = max(cent[3],np.abs(vertices[i][1]-cent[1]))
+
+		self.sketchParams[name] = cent; 
+
+
+
 	def stateObsUpdate(self,name,relation,pos="Is"):
 		if(name == 'You'):
 			#Take Cops Position, builid box around it
@@ -139,7 +158,15 @@ class Model:
 			soft = Softmax()
 			soft.buildPointsModel(points,steepness=3); 
 		else:
-			soft = self.sketches[name]; 
+			#If you want to actually pull the sketch, you'll still need to find "all classes of dir X"
+			#soft = self.sketches[name]; 
+
+			#Just make a hidden box with similar spatial extent
+			cp = self.sketchParams[name]; 
+			points = [[cp[0]-cp[2],cp[1]-cp[3]],[cp[0]+cp[2],cp[1]-cp[3]],[cp[0]+cp[2],cp[1]+cp[3]],[cp[0]-cp[2],cp[1]+cp[3]]];
+			soft = Softmax(); 
+			soft.buildPointsModel(points,steepness=3); 
+
 		softClass = self.spatialRealtions[relation]; 
 
 		if(pos=="Is"):
@@ -167,16 +194,17 @@ class Model:
 		radius = self.ROBOT_VIEW_RADIUS; 
 		points = [[cp[0]-radius,cp[1]-radius],[cp[0]+radius,cp[1]-radius],[cp[0]+radius,cp[1]+radius],[cp[0]-radius,cp[1]+radius]]; 
 		soft = Softmax()
-		soft.buildPointsModel(points,steepness=1);
+		soft.buildPointsModel(points,steepness=5);
 		#soft.buildTriView(pose = [cp[0],cp[1],theta],length=10,steepness=5); 
 		change = False; 
 		post = GM(); 
 		for g in self.belief:
-			if(distance(cp,g.mean) > self.ROBOT_VIEW_RADIUS+5):
+			#if(distance(cp,g.mean) > self.ROBOT_VIEW_RADIUS+5):
+			if(mahalanobisDistance(cp,g.mean,g.var) > 2):
 				post.addG(g); 
 			else:
 				change = True; 
-				tmp = soft.lwisUpdate(g,0,20,inverse=True);
+				tmp = soft.lwisUpdate(g,0,100,inverse=True);
 				#self.bounds = {'low':[0,0],'high':[437,754]}
 				tmp.mean[0] = max(self.bounds['low'][0]+1,tmp.mean[0]); 
 				tmp.mean[1] = max(self.bounds['low'][1]+1,tmp.mean[1]); 
@@ -191,6 +219,59 @@ class Model:
 		return change; 
 
 
+	def stateDynamicsUpdate(self):
+
+		if(self.truth):
+			#update robber pose
+			p = np.matrix(self.robPose); 
+			s = self.TARGET_NOMINAL_SPEED; 
+			if(self.TARGET_MOVEMENT_MODEL == 'Stationary'):
+				STM = np.matrix([[1,0],[0,1]]); 
+				var = np.matrix([[0.00000001,0],[0,0.00000001]]); 
+				x = p.tolist()[0]
+			elif(self.TARGET_MOVEMENT_MODEL == 'Random'):
+				STM = np.matrix([[1,0],[0,1]]);
+				var = np.matrix([[s**2, 0],[0,s**2]]); 
+				x = np.random.multivariate_normal((STM*(p.T)).T.tolist()[0],var,size =1)[0].tolist();
+			elif(self.TARGET_MOVEMENT_MODEL == 'NCV'):
+				STM = np.matrix([[1,0,1,0],[0,1,0,1],[0,0,1,0],[0,0,0,1]]); 
+				var = np.matrix([[.1,0,0,0],[0,.1,0,0],[0,0,.25,0],[0,0,0,.25]]);
+
+				x = np.random.multivariate_normal((STM*(p.T)).T.tolist()[0],var,size =1)[0].tolist();
+			else:
+				print("Please Configure a valid target model"); 
+				exit(0); 
+
+
+			if(x[0] < 0 or x[0] > self.bounds['high'][0]):
+				if(self.TARGET_MOVEMENT_MODEL == 'NCV'):
+					x[2] = -x[2]; 
+
+			if(x[1] < 0 or x[1] > self.bounds['high'][1]):
+				if(self.TARGET_MOVEMENT_MODEL == 'NCV'):
+					x[3] = -x[3]; 			
+
+			
+			for i in range(0,len(x)):
+				x[i] = max(self.bounds['low'][i]+self.TARGET_SIZE_RADIUS/2,x[i]); 
+				x[i] = min(self.bounds['high'][i]-self.TARGET_SIZE_RADIUS/2,x[i]); 
+
+
+
+			x[0] = int(x[0]); 
+			x[1] = int(x[1]); 
+
+			self.robPose = x; 
+
+		if(not self.truth):
+			#update belief
+			if(self.TARGET_MOVEMENT_MODEL == 'Stationary'):
+				pass;
+			else:
+				s = self.TARGET_NOMINAL_SPEED;
+				var = np.array([[s**2, 0],[0,s**2]]); 
+				for g in self.belief:
+					g.var = (np.array(g.var) + var).tolist(); 
 
 
 

@@ -24,10 +24,9 @@ __status__ = "Development"
 
 
 import julia; 
-from robotControllers import Controller
 
 
-class JuliaController(Controller):
+class JuliaController():
 
 
 	def __init__(self,model=None):
@@ -43,9 +42,29 @@ class JuliaController(Controller):
 		# self.planner = planner; 
 		# self.b = self.initDist(pomdp); 
 
+		j = julia.Julia(); 
+
+
+		j.include("RTDuneJulia.jl"); 
+		self.getAct = j.eval("getAct"); 
+
+		#set up julia bridge
+
 
 	def getActionKey(self):
 		# act = self.getPOMCPAction(self.planner,self.b); 
+
+		goal = self.model.belief.findMAPN();
+		pose = self.model.copPose; 
+
+		diffs = [0.,0.]; 
+		diffs[0] += goal[0]-pose[0]; 
+		diffs[1] += goal[1]-pose[1]; 
+
+
+		#ping julia bridge
+		act = self.getAct(diffs); 
+		#print(diffs,act); 
 		return act; 
 
 if __name__ == '__main__':

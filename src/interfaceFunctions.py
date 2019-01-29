@@ -31,6 +31,7 @@ from scipy.spatial import ConvexHull
 import time
 
 from planeFunctions import *;
+from helpers import Timer
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure, SubplotParams
@@ -53,7 +54,18 @@ def makeBeliefMap(wind):
 	ax.set_axis_off(); 
 
 	canvas.draw(); 
-	return canvas; 
+
+	#canvas = makeBeliefMap(wind); 
+	size = canvas.size(); 
+	width,height = size.width(),size.height(); 
+	im = QImage(canvas.buffer_rgba(),width,height,QtGui.QImage.Format_ARGB32); 
+	im = im.rgbSwapped(); 
+	pm = QPixmap(im); 
+	pm = pm.scaled(wind.imgWidth,wind.imgHeight);
+	paintPixToPix(wind.beliefLayer,pm,wind.beliefOpacitySlider.sliderPosition()/100);   
+
+
+	#return canvas; 
 
 #Converts a transition or cost model to an image
 def makeModelMap(wind,layer):
@@ -90,9 +102,7 @@ def moveRobot(wind,eventKey=None):
 
 	#place the breadcrumbs
 	wind.trueModel.prevPoses.append(copy(wind.trueModel.copPose)); 
-	if(len(wind.trueModel.prevPoses) > wind.trueModel.BREADCRUMB_TRAIL_LENGTH):
-		wind.trueModel.prevPoses = wind.trueModel.prevPoses[1:];  
-	planeFlushColors(wind.trailLayer,wind.trueModel.prevPoses,wind.breadColors); 
+
 
 
 	nomSpeed = wind.trueModel.ROBOT_NOMINAL_SPEED; 
@@ -129,16 +139,37 @@ def moveRobot(wind,eventKey=None):
 	wind.assumedModel.copPose = wind.trueModel.copPose;
 	wind.assumedModel.prevPoses = wind.trueModel.prevPoses; 
 
+	wind.trueModel.stateDynamicsUpdate(); 
+	wind.assumedModel.stateDynamicsUpdate(); 
+
+	# if(not wind.sketchingInProgress):
 	movementViewChanges(wind);
+	if(len(wind.trueModel.prevPoses) > wind.trueModel.BREADCRUMB_TRAIL_LENGTH):
+		wind.trueModel.prevPoses = wind.trueModel.prevPoses[1:];  
+	planeFlushColors(wind.trailLayer,wind.trueModel.prevPoses,wind.breadColors); 
 
 	if(len(wind.assumedModel.prevPoses) > 1):
+		change = False
+
 		change = wind.assumedModel.stateLWISUpdate(); 
 		if(change):
-			wind.tabs.removeTab(0); 
-			pm = makeBeliefMap(wind); 
-			wind.beliefMapWidget = pm; 
-			wind.tabs.insertTab(0,wind.beliefMapWidget,'Belief');
-			wind.tabs.setCurrentIndex(0);   
+			a = 0; 
+			#wind.tabs.removeTab(0); 
+			#a = 0; 
+			#makeBeliefMap(wind); 
+			#print(wind.beliefOpacitySlider.sliderPosition()); 
+			# canvas = makeBeliefMap(wind); 
+			# size = canvas.size(); 
+			# width,height = size.width(),size.height(); 
+			# im = QImage(canvas.buffer_rgba(),width,height,QtGui.QImage.Format_ARGB32); 
+			# pm = QPixmap(im); 
+			# pm = pm.scaled(wind.imgWidth,wind.imgHeight);
+			# paintPixToPix(wind.beliefLayer,pm);   
+
+
+			#wind.beliefMapWidget = pm; 
+			#wind.tabs.insertTab(0,wind.beliefMapWidget,'Belief');
+			#wind.tabs.setCurrentIndex(0);   
 	if(wind.TARGET_STATUS=='loose'):
 		checkEndCondition(wind); 
 
@@ -181,9 +212,11 @@ def movementViewChanges(wind):
 		for j in range(-int(rad/2) + wind.trueModel.copPose[1],int(rad/2)+wind.trueModel.copPose[1]):
 			tmp1 = min(wind.imgWidth-1,max(0,i)); 
 			tmp2 = min(wind.imgHeight-1,max(0,j)); 
-			points.append([tmp1,tmp2]); 
+			if(distance([tmp1,tmp2],wind.trueModel.copPose) < rad/2):
+				points.append([tmp1,tmp2]); 
 	defog(wind,points); 
 
+	#Cop
 	points = []; 
 	rad = wind.trueModel.ROBOT_SIZE_RADIUS; 
 	for i in range(-int(rad/2)+wind.trueModel.copPose[0],int(rad/2)+wind.trueModel.copPose[0]):
@@ -194,6 +227,20 @@ def movementViewChanges(wind):
 			wind.assumedModel.transitionLayer[tmp1,tmp2] = wind.trueModel.transitionLayer[tmp1,tmp2];
 
 	planeFlushPaint(wind.robotPlane,points,QColor(0,255,0,255)); 
+
+	#Robber
+	points = []; 
+	rad = wind.trueModel.TARGET_SIZE_RADIUS; 
+	for i in range(-int(rad/2)+wind.trueModel.robPose[0],int(rad/2)+wind.trueModel.robPose[0]):
+		for j in range(-int(rad/2) + wind.trueModel.robPose[1],int(rad/2)+wind.trueModel.robPose[1]):
+			#if(i>0 and j>0 and i<wind.imgHeight and j<wind.imgWidth):
+			tmp1 = min(wind.imgWidth-1,max(0,i)); 
+			tmp2 = min(wind.imgHeight-1,max(0,j)); 
+			points.append([tmp1,tmp2]); 
+	planeFlushPaint(wind.targetPlane,points,QColor(255,0,255,255)); 
+ 
+
+	makeBeliefMap(wind); 
 
 
 
@@ -219,18 +266,27 @@ def imageMousePress(QMouseEvent,wind):
 			planeFlushPaint(wind.allSketchPlanes[name],[]);
 
 def imageMouseMove(QMouseEvent,wind):
+
+
 	if(wind.sketchingInProgress):
+
 		tmp = [int(QMouseEvent.scenePos().x()),int(QMouseEvent.scenePos().y())]; 
+		#tmp = [int(QMouseEvent.x()),int(QMouseEvent.y())]; 
 		wind.allSketchPaths[-1].append(tmp); 
 		#add points to be sketched
-		points = []; 
-		si = wind.sketchDensity;
-		for i in range(-si,si+1):
-			for j in range(-si,si+1):
-				points.append([tmp[0]+i,tmp[1]+j]); 
-
+		# points = []; 
+		# si = wind.sketchDensity;
+		# for i in range(-si,si+1):
+		# 	for j in range(-si,si+1):
+		# 		points.append([tmp[0]+i,tmp[1]+j]); 
+		pen = QPen(QColor(0,0,0,255)); 
+		pen.setWidth(wind.sketchDensity*2); 
 		name = wind.sketchName.text(); 
-		planeAddPaint(wind.allSketchPlanes[name],points); 
+
+
+		planeAddPaint(wind.allSketchPlanes[name],[tmp],pen=pen); 
+
+		#print(""); 
 
 def imageMouseRelease(QMouseEvent,wind):
 
@@ -239,23 +295,70 @@ def imageMouseRelease(QMouseEvent,wind):
 		wind.sketchName.clear();
 		wind.sketchName.setPlaceholderText("Sketch Name");
 
-		cost = wind.costRadioGroup.checkedId(); 
-		speed = wind.speedRadioGroup.checkedId(); 
-		wind.safeRadio.setChecked(True); 
-		wind.nomRadio.setChecked(True); 
+		# cost = wind.costRadioGroup.checkedId(); 
+		# speed = wind.speedRadioGroup.checkedId(); 
+		# wind.safeRadio.setChecked(True); 
+		# wind.nomRadio.setChecked(True); 
 
 		wind.allSketches[tmp] = wind.allSketchPaths[-1]; 
 		wind.sketchListen = False; 
 		wind.sketchingInProgress = False; 
-		updateModels(wind,tmp,cost,speed);
+		makeModel(wind,tmp);
 
-def updateModels(wind,name,cost,speed):
+
+def redrawSketches(wind):
+	#print("Redrawing"); 
+	for name in wind.sketchLabels.keys():
+		updateModel(wind,name); 
+
+
+def updateModel(wind,name):
+
+	centx,centy = wind.sketchLabels[name]; 
+	planeFlushPaint(wind.allSketchPlanes[name]); 
+
+	pm = wind.allSketchPlanes[name].pixmap(); 
+	paintBlack = QPainter(pm); 
+	pen = QPen(QColor(255,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
+	pen.setWidth(10); 
+	paintBlack.setPen(pen); 
+	paintBlack.setFont(QtGui.QFont('Decorative',25)); 
+	paintBlack.drawText(QPointF(centx,centy),name); 
+	pen = QPen(QColor(0,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
+	pen.setWidth(wind.sketchDensity*2);
+	paintBlack.setPen(pen); 
+	
+
+	for l in wind.sketchLines[name]['Black']:
+		paintBlack.drawLine(l); 
+
+	paintBlack.end(); 
+
+
+	paintRed = QPainter(pm); 
+	pen = QPen(QColor(255,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
+	pen.setWidth(np.floor(wind.sketchDensity));
+	paintRed.setPen(pen); 
+	
+	for l in wind.sketchLines[name]['Red']:
+		paintRed.drawLine(l); 
+
+	paintRed.end(); 
+
+
+	wind.allSketchPlanes[name].setPixmap(pm); 
+
+
+def makeModel(wind,name):
 	pairedPoints = np.array(wind.allSketches[name]); 
 	cHull = ConvexHull(pairedPoints); 
 	xFudge = len(name)*10/2; 
 
+	#print(cHull.vertices.tolist()); 
+	#print(wind.allSketches[name]); 
 	vertices = fitSimplePolyToHull(cHull,pairedPoints,N=wind.NUM_SKETCH_POINTS); 
-
+	#print(len(vertices)); 
+	#print(vertices); 
 
 	centx = np.mean([vertices[i][0] for i in range(0,len(vertices))])-xFudge; 
 	centy = np.mean([vertices[i][1] for i in range(0,len(vertices))]) 
@@ -265,49 +368,68 @@ def updateModels(wind,name,cost,speed):
 	planeFlushPaint(wind.allSketchPlanes[name]); 
 
 	pm = wind.allSketchPlanes[name].pixmap(); 
-	painter = QPainter(pm); 
-	pen = QPen(QColor(255,0,0,255)); 
+	paintBlack = QPainter(pm); 
+	pen = QPen(QColor(255,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
 	pen.setWidth(10); 
-	painter.setPen(pen); 
-	painter.setFont(QtGui.QFont('Decorative',25)); 
-	painter.drawText(QPointF(centx,centy),name); 
-	pen = QPen(QColor(0,0,0,255)); 
+	paintBlack.setPen(pen); 
+	paintBlack.setFont(QtGui.QFont('Decorative',25)); 
+	paintBlack.drawText(QPointF(centx,centy),name); 
+	pen = QPen(QColor(0,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
 	pen.setWidth(wind.sketchDensity*2);
-	painter.setPen(pen); 
-	 
-	for i in range(0,len(vertices)):
-		painter.drawLine(QLineF(vertices[i-1][0],vertices[i-1][1],vertices[i][0],vertices[i][1])); 
+	paintBlack.setPen(pen); 
+	
+	vpaint = pairedPoints[cHull.vertices.tolist()]; 
+	wind.sketchLines[name] = {'Red':[],'Black':[]}; 
+	for i in range(0,len(vpaint)):
+		tmp = QLineF(vpaint[i-1][0],vpaint[i-1][1],vpaint[i][0],vpaint[i][1]); 
+		wind.sketchLines[name]['Black'].append(tmp); 
+		paintBlack.drawLine(tmp); 
 
-	painter.end(); 
+	paintBlack.end(); 
+
+
+	paintRed = QPainter(pm); 
+	pen = QPen(QColor(255,0,0,255*wind.sketchOpacitySlider.sliderPosition()/100)); 
+	pen.setWidth(np.floor(wind.sketchDensity));
+	paintRed.setPen(pen); 
+	
+	for i in range(0,len(vertices)):
+		tmp = QLineF(vertices[i-1][0],vertices[i-1][1],vertices[i][0],vertices[i][1]);
+		wind.sketchLines[name]['Red'].append(tmp); 
+		paintRed.drawLine(tmp); 
+
+	paintRed.end(); 
+
+
 	wind.allSketchPlanes[name].setPixmap(pm); 
 
 	wind.assumedModel.makeSketch(vertices,name);
 
 
-	#Update Cost Map
-	poly = Polygon(vertices); 
-	poly = poly.convex_hull; 
-	mina = min([v[0] for v in vertices]);
-	minb = min([v[1] for v in vertices]); 
-	maxa = max([v[0] for v in vertices]); 
-	maxb = max([v[1] for v in vertices]); 
+	# #Update Cost Map
+	# poly = Polygon(vertices); 
+	# poly = poly.convex_hull; 
+	# mina = min([v[0] for v in vertices]);
+	# minb = min([v[1] for v in vertices]); 
+	# maxa = max([v[0] for v in vertices]); 
+	# maxb = max([v[1] for v in vertices]); 
 
 
-	if(speed != 0 or cost != 0):
+	# if(speed != 0 or cost != 0):
 
-		for i in range(mina,maxa):
-			for j in range(minb,maxb):
-				if(poly.contains(Point(i,j))):
-					if(speed!=0):
-						wind.assumedModel.transitionLayer[i,j] = 5*speed; 
-					if(cost!=0):
-						wind.assumedModel.costLayer[i,j] = cost*10; 
-		if(cost!=0):		
-			cm = makeModelMap(wind,wind.assumedModel.costLayer); 
-			wind.costMapWidget.setPixmap(cm); 
-		if(speed!=0):
-			tm = makeModelMap(wind,wind.assumedModel.transitionLayer); 
-			wind.transMapWidget_assumed.setPixmap(tm); 
+	# 	for i in range(mina,maxa):
+	# 		for j in range(minb,maxb):
+	# 			if(poly.contains(Point(i,j))):
+	# 				if(speed!=0):
+	# 					wind.assumedModel.transitionLayer[i,j] = 5*speed; 
+	# 				if(cost!=0):
+	# 					wind.assumedModel.costLayer[i,j] = cost*10; 
+	# 	if(cost!=0):		
+	# 		cm = makeModelMap(wind,wind.assumedModel.costLayer); 
+	# 		wind.costMapWidget.setPixmap(cm); 
+	# 	if(speed!=0):
+	# 		tm = makeModelMap(wind,wind.assumedModel.transitionLayer); 
+	# 		wind.transMapWidget_assumed.setPixmap(tm); 
 
 
 
@@ -350,6 +472,16 @@ def fitSimplePolyToHull(cHull,pairedPoints,N = 4):
 def distance(p1,p2):
 	return np.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2);
 
+def mahalanobisDistance(point,mean,var):
+	S = np.matrix(var); 
+	R = np.matrix(point).T; 
+	mu = np.matrix(mean).T; 
+
+	return np.sqrt((R-mu).T * S.I * (R-mu)); 
+	
+
+
+
 def angleOfThreePoints(a,b,c):
 	ab = [b[0]-a[0],b[1]-a[1]]; 
 	bc = [c[0]-b[0],c[1]-b[1]]; 
@@ -370,38 +502,40 @@ def controlTimerTimeout(wind):
 	arrowEvents = [QtCore.Qt.Key_Up,QtCore.Qt.Key_Down,QtCore.Qt.Key_Left,QtCore.Qt.Key_Right]; 
 	if(wind.TARGET_STATUS == 'loose'):
 
-		if(wind.CONTROL_TYPE == "MAP"):
-			moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
-		elif(wind.CONTROL_TYPE == "POMCP"):
-			bel = wind.assumedModel.belief; 
-			tmp = "{}\n".format(bel.size)
-			#print(tmp); 
-			wind.control.stdin.write(tmp.encode('utf-8')); 
-			wind.control.stdin.flush(); 
+		# if(wind.CONTROL_TYPE == "MAP"):
+		# 	moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
+		# elif(wind.CONTROL_TYPE == "POMCP"):
+		# 	bel = wind.assumedModel.belief; 
+		# 	tmp = "{}\n".format(bel.size)
+		# 	#print(tmp); 
+		# 	wind.control.stdin.write(tmp.encode('utf-8')); 
+		# 	wind.control.stdin.flush(); 
 
-			for g in bel:
-				toSend = [wind.assumedModel.copPose[0],wind.assumedModel.copPose[1],g.mean[0],g.mean[1],np.sqrt(g.var[0][0]),np.sqrt(g.var[1][1]),g.weight]; 
-				#print(toSend); 
-				for t in toSend:
-					tmp = "{}\n".format(t); 
-					wind.control.stdin.write(tmp.encode('utf-8')); 
-					wind.control.stdin.flush(); 
-			#time.sleep(1); 
-			#print("Sent"); 
-			act = "100"; 
-			while(1>0):
-				#print(act); 
-				act = wind.control.stdout.readline().decode('utf-8');
-				#print(len(act)); 
-				try:
-					int(act); 
-					break; 
-				except(ValueError):
-					print(act); 
-					continue; 
-			#print(act); 
-			act = int(act);  
-			moveRobot(wind,arrowEvents[act]); 
+		# 	for g in bel:
+		# 		toSend = [wind.assumedModel.copPose[0],wind.assumedModel.copPose[1],g.mean[0],g.mean[1],np.sqrt(g.var[0][0]),np.sqrt(g.var[1][1]),g.weight]; 
+		# 		#print(toSend); 
+		# 		for t in toSend:
+		# 			tmp = "{}\n".format(t); 
+		# 			wind.control.stdin.write(tmp.encode('utf-8')); 
+		# 			wind.control.stdin.flush(); 
+		# 	#time.sleep(1); 
+		# 	#print("Sent"); 
+		# 	act = "100"; 
+		# 	while(1>0):
+		# 		#print(act); 
+		# 		act = wind.control.stdout.readline().decode('utf-8');
+		# 		#print(len(act)); 
+		# 		try:
+		# 			int(act); 
+		# 			break; 
+		# 		except(ValueError):
+		# 			print(act); 
+		# 			continue; 
+		# 	#print(act); 
+		# 	act = int(act);  
+		# 	moveRobot(wind,arrowEvents[act]); 
+		if(not wind.sketchingInProgress):
+			moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
 
 
 def findMixtureParams(mixture):
@@ -446,12 +580,15 @@ def revealMapDrone(wind,point):
 	rad = wind.DRONE_VIEW_RADIUS;
 	points=[]; 
 
-	print()
+
+	#print()
 	for i in range(-int(rad/2)+int(point[0]),int(rad/2)+int(point[0])):
 		for j in range(-int(rad/2) + int(point[1]),int(rad/2)+int(point[1])):
+
 			tmp1 = min(wind.imgWidth-1,max(0,i)); 
 			tmp2 = min(wind.imgHeight-1,max(0,j)); 
-			points.append([tmp1,tmp2]); 
+			if(distance([tmp1,tmp2],point) < rad/2):
+				points.append([tmp1,tmp2]); 
 
 	defog(wind,points); 
 
@@ -488,11 +625,12 @@ def pushButtonPressed(wind):
 
 	wind.assumedModel.stateObsUpdate(name,rel,pos); 
 
-	wind.tabs.removeTab(0); 
-	pm = makeBeliefMap(wind); 
-	wind.beliefMapWidget = pm; 
-	wind.tabs.insertTab(0,wind.beliefMapWidget,'Belief');
-	wind.tabs.setCurrentIndex(0); 
-	wind.lastPush = [pos,rel,name]; 
+	#makeBeliefMap(wind); 
+	# wind.tabs.removeTab(0); 
+	# pm = makeBeliefMap(wind); 
+	# wind.beliefMapWidget = pm; 
+	# wind.tabs.insertTab(0,wind.beliefMapWidget,'Belief');
+	# wind.tabs.setCurrentIndex(0); 
+	# wind.lastPush = [pos,rel,name]; 
 
 

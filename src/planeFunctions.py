@@ -100,15 +100,33 @@ def planeFlushColors(planeWidget,points=[],cols=[]):
 	pm = planeWidget.pixmap(); 
 	pm.fill(QColor(0,0,0,0)); 
 
+	p = points[::-1]; 
 
 	painter = QPainter(pm); 
-	for i in range(0,len(points)):
+	for i in range(0,len(p)):
 		pen = QPen(cols[i]); 
-		pen.setWidth(3); 
+		pen.setWidth(5); 
 		painter.setPen(pen); 
-		painter.drawPoint(points[i][0],points[i][1]); 
+		painter.drawPoint(p[i][0],p[i][1]); 
 	painter.end(); 
 	planeWidget.setPixmap(pm); 
 
 
 
+def paintPixToPix(planeWidget,newPM,opacity):
+	pm = planeWidget.pixmap(); 
+	pm.fill(QColor(0,0,0,0)); 
+
+	painter = QPainter(pm); 
+	# for i in range(0,pm.width()):
+	# 	for j in range(0,pm.height()):
+	# 		#pen = QPen(QColor(im.pixel(i,j))); 
+	# 		col = QColor(im.pixel(i,j)).getRgb(); 
+	# 		pen = QPen(QColor(col[0],col[1],col[2],100))
+	# 		pen.setWidth(1); 
+	# 		painter.setPen(pen); 
+	# 		painter.drawPoint(i,j); 
+	painter.setOpacity(opacity); 
+	painter.drawPixmap(0,0,newPM); 
+	painter.end(); 
+	planeWidget.setPixmap(pm); 

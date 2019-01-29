@@ -36,6 +36,7 @@ from PyQt5.QtWidgets import *;
 from PyQt5.QtGui import *;
 from PyQt5.QtCore import *;
 import sys,os
+sys.path.append(''); 
 
 import numpy as np
 import time
@@ -55,6 +56,7 @@ from robotControllers import Controller;
 from juliaController import JuliaController
 
 
+
 class SimulationWindow(QWidget):
 
 	def __init__(self,cf):
@@ -63,10 +65,12 @@ class SimulationWindow(QWidget):
 		with open(cf,'r') as stream:
 			self.params = yaml.load(stream); 
 
-		self.setGeometry(1,1,1350,800)
+		#self.setGeometry(1,1,1350,800)
+		self.setGeometry(-10,-10,877,812)
+		self.setStyleSheet("background-color:slategray;")
 		self.layout = QGridLayout(); 
-		self.layout.setColumnStretch(0,2); 
-		self.layout.setColumnStretch(1,2);
+		#self.layout.setColumnStretch(0,2); 
+		self.layout.setColumnStretch(0,2);
 		#self.layout.setColumnStretch(2,.1); 
 		# self.layout.setColumnStretch(3,1);
 		# self.layout.setColumnStretch(4,1);
@@ -95,7 +99,8 @@ class SimulationWindow(QWidget):
 		self.allSketchPaths = []; 
 		self.allSketchPlanes = {}; 
 		self.sketchLabels = {}; 
-		self.sketchDensity = 3; #radius in pixels of drawn sketch points
+		self.sketchLines = {}; 
+		self.sketchDensity = self.params['Interface']['sketchDensity'];
 		self.NUM_SKETCH_POINTS = self.params['Interface']['numSketchPoints']; 
 
 		#Drone Params
@@ -104,26 +109,29 @@ class SimulationWindow(QWidget):
 		self.timeLeft = self.DRONE_WAIT_TIME; 
 		self.DRONE_VIEW_RADIUS = self.params['Interface']['droneViewRadius'];
 
+
 		#Controller Paramas
 		self.CONTROL_FREQUENCY = self.params['Interface']['controlFreq']; #Hz
 		
 		if(self.CONTROL_TYPE == "MAP"):
 			self.control = Controller(self.assumedModel); 
 		elif(self.CONTROL_TYPE == "POMCP"):		
-			self.control = sp.Popen(['python','-u','juliaBridge.py'],stdin = sp.PIPE,stdout = sp.PIPE,stderr=sp.STDOUT)
+			#self.control = sp.Popen(['python','-u','juliaBridge.py'],stdin = sp.PIPE,stdout = sp.PIPE,stderr=sp.STDOUT)
+			self.control = JuliaController(self.assumedModel); 
 
 
 		
 		self.makeMapGraphics();
 
-		self.makeTabbedGraphics(); 
+		#self.makeTabbedGraphics(); 
 
 		self.populateInterface(); 
 		self.connectElements(); 
 
-		self.makeRobot();
-		self.makeTarget();
+		self.makeRobots();
+		#self.makeTarget();
 
+		makeBeliefMap(self); 
 
 		loadQuestions(self); 
 
@@ -140,7 +148,7 @@ class SimulationWindow(QWidget):
 		num_crumbs = self.trueModel.BREADCRUMB_TRAIL_LENGTH; 
 
 		for i in range(0,num_crumbs):
-			alpha = 255*(i)/num_crumbs; 
+			alpha = 255*(num_crumbs-i)/num_crumbs; 
 			self.breadColors.append(QColor(255,0,0,alpha))
 
 
@@ -152,7 +160,7 @@ class SimulationWindow(QWidget):
 				moveRobot(self,event.key()); 
 
 	#Initializes robot position in layer
-	def makeRobot(self):
+	def makeRobots(self):
 		moveRobot(self,None); 
 		 
 	#Initializes target position in layer	
@@ -177,6 +185,9 @@ class SimulationWindow(QWidget):
 
 		makeTruePlane(self); 
 
+		#make targetPose plane
+		self.targetPlane = self.imageScene.addPixmap(makeTransparentPlane(self));
+
 		makeFogPlane(self);
 
 		#make sketchPlane
@@ -185,9 +196,6 @@ class SimulationWindow(QWidget):
 
 		#make robotPose plane
 		self.robotPlane = self.imageScene.addPixmap(makeTransparentPlane(self));
-
-		#make targetPose plane
-		self.targetPlane = self.imageScene.addPixmap(makeTransparentPlane(self));
 
 		#make click layer
 		self.clickPlane = self.imageScene.addPixmap(makeTransparentPlane(self));
@@ -198,73 +206,12 @@ class SimulationWindow(QWidget):
 		#Make goal layer
 		self.goalLayer = self.imageScene.addPixmap(makeTransparentPlane(self)); 
 
+		self.beliefLayer = self.imageScene.addPixmap(makeTransparentPlane(self)); 
+		
 
 		self.imageView.setScene(self.imageScene); 
-		self.layout.addWidget(self.imageView,0,1,15,1); 
+		self.layout.addWidget(self.imageView,0,0,15,1); 
 
-
-
-
-
-	def makeTabbedGraphics(self):
-		
-		self.tabs = QTabWidget(self); 
-
-		#Belief Map
-		#************************************************************
-		#self.beliefMapWidget = QLabel(self); 
-		self.beliefMapWidget = makeBeliefMap(self); 
-		#self.beliefMapWidget.setPixmap(pm); 
-		self.tabs.addTab(self.beliefMapWidget,'Belief'); 
-
-		#Transitions Map
-		#************************************************************
-		self.assumedModel.transitionLayer = convertPixmapToGrayArray(self.fogPlane.pixmap()); 
-		self.assumedModel.transitionLayer /= 255.0;
-		self.assumedModel.transitionLayer = np.amax(self.assumedModel.transitionLayer)  - self.assumedModel.transitionLayer; 
-		self.assumedModel.transitionLayer *= 10.0;
-		self.assumedModel.transitionLayer -= 5.0; 
-
-		###Saves the map to a pdf file
-		# plt.figure(figsize = (4.3,7.5));  
-		# plt.contourf(np.flipud(np.amax(self.assumedModel.transitionLayer)-np.transpose(self.assumedModel.transitionLayer)),cmap='seismic'); 
-		# plt.axis('off'); 
-		# plt.savefig('../img/assumed_Transitions.pdf',format='pdf',dpi=1000,bbox_inches='tight'); 
-
-		self.trueModel.transitionLayer = convertPixmapToGrayArray(self.truePlane.pixmap());
-		self.trueModel.transitionLayer /= 255.0;
-		self.trueModel.transitionLayer = np.amax(self.trueModel.transitionLayer) - self.trueModel.transitionLayer; 
-		self.trueModel.transitionLayer *= 10.0;
-		self.trueModel.transitionLayer -= 5.0; 
-
-		###Saves the map to a pdf file
-		# plt.figure(figsize = (4.3,7.5)); 
-		# plt.contourf(np.flipud(np.amax(self.assumedModel.transitionLayer)-np.transpose(self.trueModel.transitionLayer)),cmap='seismic'); 
-		# plt.axis('off'); 
-		# plt.savefig('../img/true_Transitions.pdf',format='pdf',dpi=1000,bbox_inches='tight'); 
-
-		self.transMapWidget_true = QLabel(); 
-		tm = makeModelMap(self,self.trueModel.transitionLayer); 
-		self.transMapWidget_true.setPixmap(tm); 
-		self.tabs.addTab(self.transMapWidget_true,'True Transitions'); 
-
-
-		self.transMapWidget_assumed = QLabel(); 
-		tm = makeModelMap(self,self.assumedModel.transitionLayer); 
-		self.transMapWidget_assumed.setPixmap(tm); 
-		self.tabs.addTab(self.transMapWidget_assumed,'Assumed Transitions'); 
-		
-	
-		#Cost Map
-		#************************************************************
-		self.costMapWidget = QLabel(); 
-		cm = makeModelMap(self,self.assumedModel.costLayer); 
-		self.costMapWidget.setPixmap(cm); 
-		self.tabs.addTab(self.costMapWidget,'Costs'); 
-
-
-
-		self.layout.addWidget(self.tabs,0,0,15,1); 
 
 
 	def populateInterface(self):
@@ -278,42 +225,42 @@ class SimulationWindow(QWidget):
 		#**************************************************************
 		sketchLabel = QLabel("Sketching");
 		sketchLabel.setFont(sectionHeadingFont); 
-		self.layout.addWidget(sketchLabel,1,2); 
+		self.layout.addWidget(sketchLabel,1,1); 
 
 		self.startSketchButton = QPushButton("Start\nSketch"); 
-		self.layout.addWidget(self.startSketchButton,2,2); 
+		self.layout.addWidget(self.startSketchButton,2,1); 
 
 		self.sketchName = QLineEdit();
 		self.sketchName.setPlaceholderText("Sketch Name");  
-		self.layout.addWidget(self.sketchName,2,3,1,2); 
+		self.layout.addWidget(self.sketchName,2,2,1,2); 
 
 
-		sketchButtonLabel = QLabel("Sketch Parameters"); 
-		self.layout.addWidget(sketchButtonLabel,3,2); 
+		# sketchButtonLabel = QLabel("Sketch Parameters"); 
+		# self.layout.addWidget(sketchButtonLabel,3,1); 
 
-		self.costRadioGroup = QButtonGroup(self); 
-		self.targetRadio = QRadioButton("Target"); 
-		self.costRadioGroup.addButton(self.targetRadio,id=1); 
-		self.safeRadio = QRadioButton("Nominal"); 
-		self.safeRadio.setChecked(True); 
-		self.costRadioGroup.addButton(self.safeRadio,id=0); 
-		self.dangerRadio = QRadioButton("Dangerous"); 
-		self.costRadioGroup.addButton(self.dangerRadio,id=-1); 
-		self.layout.addWidget(self.targetRadio,3,3); 
-		self.layout.addWidget(self.safeRadio,4,3);
-		self.layout.addWidget(self.dangerRadio,5,3);  
+		# self.costRadioGroup = QButtonGroup(self); 
+		# self.targetRadio = QRadioButton("Target"); 
+		# self.costRadioGroup.addButton(self.targetRadio,id=1); 
+		# self.safeRadio = QRadioButton("Nominal"); 
+		# self.safeRadio.setChecked(True); 
+		# self.costRadioGroup.addButton(self.safeRadio,id=0); 
+		# self.dangerRadio = QRadioButton("Dangerous"); 
+		# self.costRadioGroup.addButton(self.dangerRadio,id=-1); 
+		# self.layout.addWidget(self.targetRadio,3,2); 
+		# self.layout.addWidget(self.safeRadio,4,2);
+		# self.layout.addWidget(self.dangerRadio,5,2);  
 
-		self.speedRadioGroup = QButtonGroup(self); 
-		self.fastRadio = QRadioButton("Fast"); 
-		self.speedRadioGroup.addButton(self.fastRadio,id=1); 
-		self.nomRadio = QRadioButton("Nominal"); 
-		self.nomRadio.setChecked(True); 
-		self.speedRadioGroup.addButton(self.nomRadio,id=0); 
-		self.slowRadio = QRadioButton("Slow"); 
-		self.speedRadioGroup.addButton(self.slowRadio,id=-1); 
-		self.layout.addWidget(self.fastRadio,3,4);
-		self.layout.addWidget(self.nomRadio,4,4); 
-		self.layout.addWidget(self.slowRadio,5,4);  
+		# self.speedRadioGroup = QButtonGroup(self); 
+		# self.fastRadio = QRadioButton("Fast"); 
+		# self.speedRadioGroup.addButton(self.fastRadio,id=1); 
+		# self.nomRadio = QRadioButton("Nominal"); 
+		# self.nomRadio.setChecked(True); 
+		# self.speedRadioGroup.addButton(self.nomRadio,id=0); 
+		# self.slowRadio = QRadioButton("Slow"); 
+		# self.speedRadioGroup.addButton(self.slowRadio,id=-1); 
+		# self.layout.addWidget(self.fastRadio,3,3);
+		# self.layout.addWidget(self.nomRadio,4,3); 
+		# self.layout.addWidget(self.slowRadio,5,3);  
 
 
 
@@ -322,12 +269,12 @@ class SimulationWindow(QWidget):
 		#**************************************************************
 		pushLabel = QLabel("Human Push"); 
 		pushLabel.setFont(sectionHeadingFont);
-		self.layout.addWidget(pushLabel,6,2); 
+		self.layout.addWidget(pushLabel,6,1); 
 
 		self.positivityDrop = QComboBox(); 
 		self.positivityDrop.addItem("Is"); 
 		self.positivityDrop.addItem("Is not"); 
-		self.layout.addWidget(self.positivityDrop,7,2); 
+		self.layout.addWidget(self.positivityDrop,7,1); 
 
 		self.relationsDrop = QComboBox();
 		self.relationsDrop.addItem("Near"); 
@@ -335,52 +282,70 @@ class SimulationWindow(QWidget):
 		self.relationsDrop.addItem("South of");
 		self.relationsDrop.addItem("East of");
 		self.relationsDrop.addItem("West of");
-		self.layout.addWidget(self.relationsDrop,7,3); 
+		self.layout.addWidget(self.relationsDrop,7,2); 
 
 		self.objectsDrop = QComboBox();
 		self.objectsDrop.addItem("You"); 
-		self.layout.addWidget(self.objectsDrop,7,4); 
+		self.layout.addWidget(self.objectsDrop,7,3); 
 
 		self.pushButton = QPushButton("Submit"); 
 		self.pushButton.setStyleSheet("background-color: green"); 
-		self.layout.addWidget(self.pushButton,7,5); 
+		self.layout.addWidget(self.pushButton,7,4); 
 
 
 		#Drone Launch Section
 		#**************************************************************
 		droneLabel = QLabel("Drone Controls"); 
 		droneLabel.setFont(sectionHeadingFont);
-		self.layout.addWidget(droneLabel,9,2); 
+		self.layout.addWidget(droneLabel,9,1); 
 
 		self.updateTimerLCD = QLCDNumber(self); 
 		self.updateTimerLCD.setSegmentStyle(QLCDNumber.Flat); 
 		self.updateTimerLCD.setStyleSheet("background-color:rgb(255,0,0)"); 
 		self.updateTimerLCD.setMaximumHeight(25);
 		self.updateTimerLCD.setMinimumHeight(25);  
-		self.layout.addWidget(self.updateTimerLCD,10,2); 
+		self.layout.addWidget(self.updateTimerLCD,10,1); 
 
 		self.droneButton = QPushButton("Launch\nDrone"); 
-		self.layout.addWidget(self.droneButton,10,2); 
+		self.layout.addWidget(self.droneButton,10,1); 
 
 
 		#Robot Pull Section
 		#**************************************************************
 		pullLabel = QLabel("Robot Pull"); 
 		pullLabel.setFont(sectionHeadingFont);
-		self.layout.addWidget(pullLabel,12,2); 
+		self.layout.addWidget(pullLabel,12,1); 
 
 		self.pullQuestion = QLineEdit("Robot Question");
 		self.pullQuestion.setReadOnly(True); 
 		self.pullQuestion.setAlignment(QtCore.Qt.AlignCenter); 
-		self.layout.addWidget(self.pullQuestion,13,2,1,3); 
+		self.layout.addWidget(self.pullQuestion,13,1,1,3); 
 
 		self.yesButton = QPushButton("Yes");  
 		self.yesButton.setStyleSheet("background-color: green"); 
-		self.layout.addWidget(self.yesButton,14,2); 
+		self.layout.addWidget(self.yesButton,14,1); 
 
 		self.noButton = QPushButton("No");  
 		self.noButton.setStyleSheet("background-color: red"); 
-		self.layout.addWidget(self.noButton,14,4); 
+		self.layout.addWidget(self.noButton,14,3); 
+
+
+		#Belief Opacity Slider
+		#**************************************************************
+		self.beliefOpacitySlider = QSlider(Qt.Horizontal); 
+		self.beliefOpacitySlider.setSliderPosition(30)
+		self.beliefOpacitySlider.setTickPosition(QSlider.TicksBelow)
+		self.beliefOpacitySlider.setTickInterval(10); 
+		self.layout.addWidget(self.beliefOpacitySlider,16,0,1,1); 
+
+
+		#Sketch Opacity Slider
+		self.sketchOpacitySlider = QSlider(Qt.Horizontal); 
+		self.sketchOpacitySlider.setSliderPosition(70); 
+		self.sketchOpacitySlider.setTickPosition(QSlider.TicksBelow); 
+		self.sketchOpacitySlider.setTickInterval(10); 
+		self.layout.addWidget(self.sketchOpacitySlider,17,0,1,1); 
+
 
 
 	def connectElements(self):
@@ -404,6 +369,9 @@ class SimulationWindow(QWidget):
 
 		self.saveAllShortcut = QShortcut(QKeySequence("Ctrl+A"),self); 
 		self.saveAllShortcut.activated.connect(self.saveAllThings);
+
+		self.beliefOpacitySlider.valueChanged.connect(lambda: makeBeliefMap(self)); 
+		self.sketchOpacitySlider.valueChanged.connect(lambda: redrawSketches(self)); 
 
 	def saveBeliefs(self):
 		np.save('../models/beliefs.npy',[self.assumedModel.belief]); 
