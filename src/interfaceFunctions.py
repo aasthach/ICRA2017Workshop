@@ -194,10 +194,23 @@ def updateSavedModel(wind):
 
 
 
+def paintTargetEnd(wind):
+	points = []; 
+	rad = wind.trueModel.TARGET_SIZE_RADIUS; 
+	for i in range(-int(rad/2)+wind.trueModel.robPose[0],int(rad/2)+wind.trueModel.robPose[0]):
+		for j in range(-int(rad/2) + wind.trueModel.robPose[1],int(rad/2)+wind.trueModel.robPose[1]):
+			#if(i>0 and j>0 and i<wind.imgHeight and j<wind.imgWidth):
+			tmp1 = min(wind.imgWidth-1,max(0,i)); 
+			tmp2 = min(wind.imgHeight-1,max(0,j)); 
+			points.append([tmp1,tmp2]); 
+	planeAddPaint(wind.fogPlane,points,QColor(255,0,255,255)); 
+
+
 def checkEndCondition(wind):
-	if(distance(wind.trueModel.copPose,wind.trueModel.robPose) < wind.trueModel.ROBOT_VIEW_RADIUS-8):
+	if(distance(wind.trueModel.copPose,wind.trueModel.robPose) < wind.trueModel.ROBOT_CATCH_RADIUS):
 		wind.TARGET_STATUS = 'captured'
 		print('End Condition Reached'); 
+		paintTargetEnd(wind); 
 		dialog = QMessageBox(); 
 		dialog.setText('Target Captured!'); 
 		dialog.exec_(); 
@@ -214,7 +227,14 @@ def movementViewChanges(wind):
 			tmp2 = min(wind.imgHeight-1,max(0,j)); 
 			if(distance([tmp1,tmp2],wind.trueModel.copPose) < rad/2):
 				points.append([tmp1,tmp2]); 
+
+	if(wind.REFOGGING):
+		refog(wind,wind.prevFogPoints); 
+
 	defog(wind,points); 
+
+	wind.prevFogPoints = points; 
+
 
 	#Cop
 	points = []; 
@@ -238,7 +258,9 @@ def movementViewChanges(wind):
 			tmp2 = min(wind.imgHeight-1,max(0,j)); 
 			points.append([tmp1,tmp2]); 
 	planeFlushPaint(wind.targetPlane,points,QColor(255,0,255,255)); 
- 
+	
+	if(wind.CHEAT_TARGET):
+		planeAddPaint(wind.fogPlane,points,QColor(255,0,255,255)); 
 
 	makeBeliefMap(wind); 
 
@@ -248,13 +270,19 @@ def startSketch(wind):
 	wind.sketchListen=True;
 	wind.allSketchPaths.append([]); 
 
+
 def imageMousePress(QMouseEvent,wind):
 	if(wind.droneClickListen):
 		wind.droneClickListen = False; 
 		tmp = [QMouseEvent.scenePos().x(),QMouseEvent.scenePos().y()]; 
 		wind.timeLeft = wind.DRONE_WAIT_TIME;
 		revealMapDrone(wind,tmp);
-		updateDroneTimer(wind);   
+		updateDroneTimer(wind);  
+		wind.refogDroneTimer = QTimer();
+		wind.refogDroneTimer.timeout.connect(lambda: refogTimerTimeout(wind)); 
+		wind.refogDroneTimer.start(1000);  
+		wind.refogTimeLeft = wind.DRONE_WAIT_TIME; 
+
 	elif(wind.sketchListen):
 		wind.sketchingInProgress = True; 
 		name = wind.sketchName.text(); 
@@ -264,6 +292,8 @@ def imageMousePress(QMouseEvent,wind):
 			wind.allSketchNames.append(name); 
 		else:
 			planeFlushPaint(wind.allSketchPlanes[name],[]);
+
+
 
 def imageMouseMove(QMouseEvent,wind):
 
@@ -288,6 +318,8 @@ def imageMouseMove(QMouseEvent,wind):
 
 		#print(""); 
 
+
+
 def imageMouseRelease(QMouseEvent,wind):
 
 	if(wind.sketchingInProgress):
@@ -304,6 +336,10 @@ def imageMouseRelease(QMouseEvent,wind):
 		wind.sketchListen = False; 
 		wind.sketchingInProgress = False; 
 		makeModel(wind,tmp);
+
+
+
+
 
 
 def redrawSketches(wind):
@@ -405,6 +441,7 @@ def makeModel(wind,name):
 
 	wind.assumedModel.makeSketch(vertices,name);
 
+	loadQuestions(wind); 
 
 	# #Update Cost Map
 	# poly = Polygon(vertices); 
@@ -497,45 +534,21 @@ def controlTimerStart(wind):
 	wind.controlTimer.start((1/wind.CONTROL_FREQUENCY)*1000); 
 
 
+def questionTimerStart(wind):
+	wind.questionTimer = QtCore.QTimer(wind); 
+	wind.questionTimer.timeout.connect(lambda: questionTimerTimeout(wind)); 
+	wind.questionTimer.start((1/wind.QUESTION_FREQUENCY)*1000); 
+
 #TODO: Change this behavior to call control  behavior of specific controllers
 def controlTimerTimeout(wind):
 	arrowEvents = [QtCore.Qt.Key_Up,QtCore.Qt.Key_Down,QtCore.Qt.Key_Left,QtCore.Qt.Key_Right]; 
 	if(wind.TARGET_STATUS == 'loose'):
-
-		# if(wind.CONTROL_TYPE == "MAP"):
-		# 	moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
-		# elif(wind.CONTROL_TYPE == "POMCP"):
-		# 	bel = wind.assumedModel.belief; 
-		# 	tmp = "{}\n".format(bel.size)
-		# 	#print(tmp); 
-		# 	wind.control.stdin.write(tmp.encode('utf-8')); 
-		# 	wind.control.stdin.flush(); 
-
-		# 	for g in bel:
-		# 		toSend = [wind.assumedModel.copPose[0],wind.assumedModel.copPose[1],g.mean[0],g.mean[1],np.sqrt(g.var[0][0]),np.sqrt(g.var[1][1]),g.weight]; 
-		# 		#print(toSend); 
-		# 		for t in toSend:
-		# 			tmp = "{}\n".format(t); 
-		# 			wind.control.stdin.write(tmp.encode('utf-8')); 
-		# 			wind.control.stdin.flush(); 
-		# 	#time.sleep(1); 
-		# 	#print("Sent"); 
-		# 	act = "100"; 
-		# 	while(1>0):
-		# 		#print(act); 
-		# 		act = wind.control.stdout.readline().decode('utf-8');
-		# 		#print(len(act)); 
-		# 		try:
-		# 			int(act); 
-		# 			break; 
-		# 		except(ValueError):
-		# 			print(act); 
-		# 			continue; 
-		# 	#print(act); 
-		# 	act = int(act);  
-		# 	moveRobot(wind,arrowEvents[act]); 
 		if(not wind.sketchingInProgress):
 			moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
+
+def questionTimerTimeout(wind):
+	wind.questionIndex = wind.control.getQuestionIndex(); 
+	setRobotPullQuestion(wind); 
 
 
 def findMixtureParams(mixture):
@@ -569,6 +582,34 @@ def droneTimerTimeout(wind):
 		wind.timeLeft -= 1; 
 	updateDroneTimer(wind); 
 
+def refogTimerTimeout(wind):
+	if(wind.refogTimeLeft > 0):
+		wind.refogTimeLeft -= 1; 
+	else:
+		wind.refogDroneTimer.stop(); 
+	updateRefogTimer(wind); 
+
+
+def updateRefogTimer(wind):
+	
+	R = wind.DRONE_VIEW_RADIUS; 
+	T = wind.DRONE_WAIT_TIME; 
+	t = wind.refogTimeLeft; 
+
+	points = wind.refogPoints; 
+	cent = wind.refogCent; 
+
+	setOfPoints = []; 
+	for p in points:
+		if(distance(cent,p) >= (t-1)*R/T and distance(cent,p) <= t*R/T):
+			setOfPoints.append(p); 
+
+	#print("Refogging: {}".format(len(setOfPoints))); 
+	if(wind.REFOGGING):
+		refog(wind,setOfPoints); 
+
+
+
 
 def launchDrone(wind):
 	if(wind.timeLeft==0):
@@ -592,6 +633,8 @@ def revealMapDrone(wind,point):
 
 	defog(wind,points); 
 
+	wind.refogPoints = points;
+	wind.refogCent = point; 
 
 def updateDroneTimer(wind):
 	rcol = 255*wind.timeLeft/wind.DRONE_WAIT_TIME; 
@@ -606,15 +649,61 @@ def updateDroneTimer(wind):
 		wind.droneButton.hide(); 
 
 
-def getNewRobotPullQuestion(wind):
-	wind.pullQuestion.setText(np.random.choice(wind.questions)); 
+def setRobotPullQuestion(wind):
+	if(wind.questionIndex > -1):
+		wind.pullQuestion.setText(wind.questions[wind.questionIndex]); 
+		#Make background not boring
+		wind.pullQuestion.setStyleSheet("border: 3px solid cyan; color: white; background-color: black");
+		wind.questionTimer.stop(); 
+	else:
+		wind.pullQuestion.setText("Awaiting Query");
+		wind.questionTimer.start();
+		#Make background boring
+		wind.pullQuestion.setStyleSheet("border: 1px solid black; color: black; background-color: slategray");
+
+
+def answerRobotPullQuestion(wind,pos):
+	if(wind.questionIndex > -1):
+
+		relations = ["South of","North of","East of", "West of","Near"]; 
+		name = "You"
+		rel = None
+
+
+		for r in relations:
+			if(r in wind.pullQuestion.text()):
+				rel = r; 
+		for o in wind.allSketchNames:
+			if(o in wind.pullQuestion.text()):
+				name = o; 
+
+		wind.assumedModel.stateObsUpdate(name,rel,pos); 
+
+		wind.questionIndex = -1;
+		setRobotPullQuestion(wind);  
+
+
+
+
 
 
 #TODO: Map in actual robot questions
 def loadQuestions(wind):
-	f = open('../data/Questions.txt','r'); 
-	lines = f.read().split("\n"); 
-	wind.questions = lines; 
+	#f = open('../data/Questions.txt','r'); 
+	#lines = f.read().split("\n"); 
+	#wind.questions = lines; 
+
+	preample = "Is the Target "
+	relations = ["South of ","North of ","East of ", "West of ","Near "]; 
+	objects = deepcopy(wind.allSketchNames);
+	objects.insert(0,"Me");  
+	questionMark = "?"; 
+
+	wind.questions = []; 
+	for o in objects:
+		for r in relations:
+			wind.questions.append(preample+r+o+questionMark);
+	
 
 
 

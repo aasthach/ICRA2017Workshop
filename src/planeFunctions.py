@@ -24,7 +24,7 @@ from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import *; 
 from PyQt5.QtGui import *;
 from PyQt5.QtCore import *;
-
+from copy import deepcopy
 
 def makeTruePlane(wind):
 
@@ -42,6 +42,7 @@ def makeFogPlane(wind):
 	paintMask.drawPixmap(0,0,fI);
 	paintMask.end();
 
+	wind.originalFog = fI.toImage(); 
 	wind.fogPlane = wind.imageScene.addPixmap(QPixmap.fromImage(wind.fogImage)); 
 
 
@@ -59,6 +60,15 @@ def defog(wind,points):
 	for p in points:
 		wind.fogImage.setPixelColor(p[0],p[1],QColor(0,0,0,0)); 
 
+	wind.fogPlane.setPixmap(QPixmap.fromImage(wind.fogImage));
+
+
+def refog(wind,points):
+
+	for p in points:
+		c = wind.originalFog.pixel(p[0],p[1]); 
+		col = QColor(c)
+		wind.fogImage.setPixelColor(p[0],p[1],col); 
 	wind.fogPlane.setPixmap(QPixmap.fromImage(wind.fogImage));
 
 def planeAddPaint(planeWidget,points=[],col=None,pen=None):

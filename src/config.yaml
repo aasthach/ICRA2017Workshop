@@ -15,14 +15,15 @@ Interface:
   #GOOD: On point, exact
   pushing: "NO"
 
-  #Control Input Source, {"Human","MAP","POMCP"}
+  #Control Input Source, {"Human","MAP","WMAP,"POMCP"}
   #Human: Requires manual input with arrow keys
   #MAP: Takes shortest route to point of highest belief
+  #WMAP: Weights belief peaks by their distance
   #POMCP: Calls JuliaPOMCP
-  controlType: "MAP"
+  controlType: "WMAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
-  numSketchPoints: 4
+  numSketchPoints: 8
 
   #Radius in pixels of drawn sketch points
   sketchDensity: 4
@@ -33,25 +34,35 @@ Interface:
   droneWaitTime: 5
 
   #Pixel radius of area revealed by drone sweep, {1-\inf}
-  droneViewRadius: 75
+  droneViewRadius: 175
 
   #How often, in Hz, the front end requests a control action, {0.00001-\inf}
   controlFreq: 2
 
+  #Maximum Frequency the controller can ask questions, {0.00001 - \inf}
+  questionFreq: 0.25
 
+  #Should the Fog of War be reset after moving through? {True,False}
+  refogging: True
 
+  #For Debugging, Shows the Target location on the fog
+  cheatTarget: False
 
 ###Model Params
 Model:
-  copInitPose: [200,500]
-  targetInitPose: [400,200]
+  #If None, randomly chosen
+  #Else: [0-437,0-754]
+  copInitPose: None
+  targetInitPose: None
 
   #Random Beliefs, if belNum is None, {1-40}
   numRandBel: 20
 
-  #How far in each direction the robot clears fog, also determines
-  #catch radius, {1-\inf}
-  robotViewRadius: 25
+  #How far in each direction the robot clears fog {1-\inf}
+  robotViewRadius: 100
+
+  #How far in each direction the robot can catch the robot {1-\inf}
+  robotCatchRadius: 25
 
   #How far the robots icon extends in each direction, in pixels, {1-\inf}
   robotSizeRadius: 10

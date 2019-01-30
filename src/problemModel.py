@@ -40,8 +40,12 @@ class Model:
 
 		#Cop Pose
 		self.copPose = params['Model']['copInitPose'];
+		if(self.copPose == 'None'):
+			self.copPose = [np.random.randint(0,437),np.random.randint(0,754)]; 
+
 
 		self.ROBOT_VIEW_RADIUS = params['Model']['robotViewRadius']; 
+		self.ROBOT_CATCH_RADIUS = params['Model']['robotCatchRadius']; 
 		self.ROBOT_SIZE_RADIUS = params['Model']['robotSizeRadius']; 
 		self.ROBOT_NOMINAL_SPEED = params['Model']['robotNominalSpeed']; 
 		self.TARGET_NOMINAL_SPEED = params['Model']['targetSpeed']; 
@@ -63,16 +67,19 @@ class Model:
 				self.belief = GM(); 
 
 				for i in range(0,self.MAX_BELIEF_SIZE):
-					self.belief.addNewG([np.random.randint(0,437),np.random.randint(0,754)],[[2000+500*np.random.normal(),0],[0,2000+500*np.random.normal()]],np.sqrt(np.random.random())); 
+					self.belief.addNewG([np.random.randint(0,437),np.random.randint(0,754)],[[4000+500*np.random.normal(),0],[0,4000+500*np.random.normal()]],np.sqrt(np.random.random())); 
 				self.belief.normalizeWeights(); 
 			else:
 				self.belief = np.load("../models/beliefs{}.npy".format(belModel))[0]
 
 
 		self.robPose = params['Model']['targetInitPose'];
-		
+		if(self.robPose == 'None'):
+			self.robPose = [np.random.randint(0,437),np.random.randint(0,754)]; 
+
+
 		if(self.TARGET_MOVEMENT_MODEL == 'NCV'):
-			self.robPose = [self.robPose[0],self.robPose[1],(np.random.random()*self.TARGET_NOMINAL_SPEED*2 - self.TARGET_NOMINAL_SPEED)**2,(np.random.random()*self.TARGET_NOMINAL_SPEED*2 - self.TARGET_NOMINAL_SPEED)**2]
+			self.robPose = [self.robPose[0],self.robPose[1],[-1,1][np.random.randint(0,2)]*self.TARGET_NOMINAL_SPEED,[-1,1][np.random.randint(0,2)]*self.TARGET_NOMINAL_SPEED]
 
 		self.bounds = {'low':[0,0,-self.TARGET_NOMINAL_SPEED,-self.TARGET_NOMINAL_SPEED],'high':[437,754,self.TARGET_NOMINAL_SPEED,self.TARGET_NOMINAL_SPEED]}
 		
@@ -134,7 +141,7 @@ class Model:
 		pz = Softmax(); 
 		vertices.sort(key=lambda x: x[1])
 
-		pz.buildPointsModel(vertices,steepness=2); 
+		pz.buildPointsModel(vertices,steepness=3); 
 		self.sketches[name] = pz; 
 
 		cent = [0,0,0,0]; 

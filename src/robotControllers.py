@@ -19,6 +19,8 @@ __maintainer__ = "Luke Burks"
 __email__ = "luke.burks@colorado.edu"
 __status__ = "Development"
 
+import numpy as np
+
 
 class Controller:
 
@@ -45,4 +47,7 @@ class Controller:
 	def getActionKey_Myopic(self):
 		goal = self.model.belief.findMAPN(); 
 		pose = self.model.copPose; 
-		
+
+	
+	def getQuestionIndex(self):
+		return np.random.randint(0,4); 
