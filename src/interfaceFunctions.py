@@ -173,24 +173,24 @@ def moveRobot(wind,eventKey=None):
 	if(wind.TARGET_STATUS=='loose'):
 		checkEndCondition(wind); 
 
-	if(wind.SAVE_FILE is not None):
-		updateSavedModel(wind); 
+	# if(wind.SAVE_FILE is not None):
+	# 	updateSavedModel(wind); 
 
 
-def updateSavedModel(wind):
-	mod = wind.assumedModel; 
+# def updateSavedModel(wind):
+# 	mod = wind.assumedModel; 
 
-	mod.history['beliefs'].append(deepcopy(mod.belief));
-	mod.history['positions'].append(deepcopy(mod.copPose)); 
-	mod.history['sketches'] = mod.sketches; 
+# 	mod.history['beliefs'].append(deepcopy(mod.belief));
+# 	mod.history['positions'].append(deepcopy(mod.copPose)); 
+# 	mod.history['sketches'] = mod.sketches; 
 
-	if(len(wind.lastPush) > 0):
-		mod.history['humanObs'].append(wind.lastPush); 
-		wind.lastPush = [];
-	else:
-		mod.history['humanObs'].append([]); 
+# 	if(len(wind.lastPush) > 0):
+# 		mod.history['humanObs'].append(wind.lastPush); 
+# 		wind.lastPush = [];
+# 	else:
+# 		mod.history['humanObs'].append([]); 
 
-	np.save(wind.SAVE_FILE,[mod.history]); 
+# 	np.save(wind.SAVE_FILE,[mod.history]); 
 
 
 
@@ -208,6 +208,7 @@ def paintTargetEnd(wind):
 
 def checkEndCondition(wind):
 	if(distance(wind.trueModel.copPose,wind.trueModel.robPose) < wind.trueModel.ROBOT_CATCH_RADIUS):
+		np.save(wind.DATA_SAVE,wind.runData); 
 		wind.TARGET_STATUS = 'captured'
 		print('End Condition Reached'); 
 		paintTargetEnd(wind); 
@@ -228,7 +229,7 @@ def movementViewChanges(wind):
 			if(distance([tmp1,tmp2],wind.trueModel.copPose) < rad/2):
 				points.append([tmp1,tmp2]); 
 
-	if(wind.REFOGGING):
+	if(wind.REFOG_COP):
 		refog(wind,wind.prevFogPoints); 
 
 	defog(wind,points); 
@@ -332,6 +333,7 @@ def imageMouseRelease(QMouseEvent,wind):
 		# wind.safeRadio.setChecked(True); 
 		# wind.nomRadio.setChecked(True); 
 
+		wind.currentSketch = [tmp,wind.allSketchPaths[-1]]; 
 		wind.allSketches[tmp] = wind.allSketchPaths[-1]; 
 		wind.sketchListen = False; 
 		wind.sketchingInProgress = False; 
@@ -544,7 +546,9 @@ def controlTimerTimeout(wind):
 	arrowEvents = [QtCore.Qt.Key_Up,QtCore.Qt.Key_Down,QtCore.Qt.Key_Left,QtCore.Qt.Key_Right]; 
 	if(wind.TARGET_STATUS == 'loose'):
 		if(not wind.sketchingInProgress):
+			wind.collectAndSaveData(); 
 			moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
+
 
 def questionTimerTimeout(wind):
 	wind.questionIndex = wind.control.getQuestionIndex(); 
@@ -605,7 +609,7 @@ def updateRefogTimer(wind):
 			setOfPoints.append(p); 
 
 	#print("Refogging: {}".format(len(setOfPoints))); 
-	if(wind.REFOGGING):
+	if(wind.REFOG_SCOUT):
 		refog(wind,setOfPoints); 
 
 
@@ -677,6 +681,7 @@ def answerRobotPullQuestion(wind,pos):
 			if(o in wind.pullQuestion.text()):
 				name = o; 
 
+		wind.currentPull = [name,rel,pos]; 
 		wind.assumedModel.stateObsUpdate(name,rel,pos); 
 
 		wind.questionIndex = -1;
@@ -712,6 +717,7 @@ def pushButtonPressed(wind):
 	name = str(wind.objectsDrop.currentText());
 	pos = str(wind.positivityDrop.currentText());
 
+	wind.currentPush = [name,rel,pos]; 
 	wind.assumedModel.stateObsUpdate(name,rel,pos); 
 
 	#makeBeliefMap(wind); 

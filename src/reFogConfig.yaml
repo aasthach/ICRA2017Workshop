@@ -1,5 +1,5 @@
 
-# File: config.yaml
+# File: reFogConfig.yaml
 # Author: Luke Burks
 # Date: May 2018
 # 
@@ -34,7 +34,7 @@ Interface:
   droneWaitTime: 5
 
   #Pixel radius of area revealed by drone sweep, {1-\inf}
-  droneViewRadius: 75
+  droneViewRadius: 175
 
   #How often, in Hz, the front end requests a control action, {0.00001-\inf}
   controlFreq: 2
@@ -43,29 +43,26 @@ Interface:
   questionFreq: 0.25
 
   #Should the scout's view have a limited time? {True,False}
-  refogScout: False
+  refogScout: True
   
   #Should the Fog of War be reset after moving through? {True,False}
-  refogCop: False
+  refogCop: True
 
   #For Debugging, Shows the Target location on the fog
-  cheatTarget: True
-
-  #Where to save the data, must end in ".npy"
-  dataSave: "../data/tmpInterfaceData.npy"
+  cheatTarget: False
 
 ###Model Params
 Model:
   #If None, randomly chosen
   #Else: [0-437,0-754]
-  copInitPose: [200,500]
-  targetInitPose: [400,200]
+  copInitPose: None
+  targetInitPose: None
 
   #Random Beliefs, if belNum is None, {1-40}
   numRandBel: 20
 
   #How far in each direction the robot clears fog {1-\inf}
-  robotViewRadius: 25
+  robotViewRadius: 100
 
   #How far in each direction the robot can catch the robot {1-\inf}
   robotCatchRadius: 25

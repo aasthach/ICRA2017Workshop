@@ -66,7 +66,9 @@ class SimulationWindow(QWidget):
 			self.params = yaml.load(stream); 
 
 		#self.setGeometry(1,1,1350,800)
-		self.setGeometry(-10,-10,684,812)
+		offset = 852; 
+		#self.setGeometry(-10,-10,684,812)
+		self.setGeometry(-10+offset,-10,684,812)
 		self.setFixedSize(684,812); 
 		self.setStyleSheet("background-color:slategray;")
 		self.layout = QGridLayout(); 
@@ -82,8 +84,15 @@ class SimulationWindow(QWidget):
 		beliefType = self.params['Model']['belNum']; 
 		pushing = self.params['Interface']['pushing']; 
 		self.CONTROL_TYPE = self.params['Interface']['controlType']; 
-		#self.SAVE_FILE = '../data/{}_bel{}_{}'.format(self.CONTROL_TYPE,beliefType,pushing,time.asctime().replace(' ','').replace(':','_')); 
-		self.SAVE_FILE = None; 
+		# #self.SAVE_FILE = '../data/{}_bel{}_{}'.format(self.CONTROL_TYPE,beliefType,pushing,time.asctime().replace(' ','').replace(':','_')); 
+		# self.SAVE_FILE = None; 
+		self.DATA_SAVE = self.params['Interface']['dataSave']; 
+
+		self.runData = {'CopPoses':[],'RobPoses':[],'Sketches':[],'Beliefs':[],'PushObservations':[],'PullObservations':[]};
+		self.currentPush = None; 
+		self.currentPull = None; 
+		self.currentSketch = None; 
+
 
 		#Make Models
 		self.trueModel = Model(self.params,trueModel=True);
@@ -103,7 +112,8 @@ class SimulationWindow(QWidget):
 		self.sketchLines = {}; 
 		self.sketchDensity = self.params['Interface']['sketchDensity'];
 		self.NUM_SKETCH_POINTS = self.params['Interface']['numSketchPoints']; 
-		self.REFOGGING = self.params['Interface']['refogging']; 
+		self.REFOG_SCOUT = self.params['Interface']['refogScout']; 
+		self.REFOG_COP = self.params['Interface']['refogCop']; 
 		self.CHEAT_TARGET = self.params['Interface']['cheatTarget']; 
 
 		#Drone Params
@@ -153,6 +163,30 @@ class SimulationWindow(QWidget):
 		questionTimerStart(self); 
 
 		self.show()
+
+
+	def collectAndSaveData(self):
+
+		cp = self.trueModel.copPose; 
+		rp = self.trueModel.robPose; 
+		bel = self.assumedModel.belief; 
+		sketch = self.currentSketch; 
+		push = self.currentPush; 
+		pull = self.currentPull; 
+
+		#self.runData = {'CopPoses':[],'RobPoses':[],'Sketches':[],'Beliefs':[],'PushObservations':[],'PullObservations':[]};
+		self.runData['CopPoses'].append(cp); 
+		self.runData['RobPoses'].append(rp); 
+		self.runData['Sketches'].append(sketch); 
+		self.runData['Beliefs'].append(bel); 
+		self.runData['PushObservations'].append(push); 
+		self.runData['PullObservations'].append(pull); 
+
+
+		self.currentPush = None; 
+		self.currentPull = None; 
+		self.currentSketch = None; 
+
 
 	#Sets up a series of QColors to let the comet trail fade
 	def makeBreadCrumbColors(self):
@@ -381,7 +415,11 @@ class SimulationWindow(QWidget):
 		sketchOLabel.setAlignment(Qt.AlignLeft); 
 		sliderLayout.addWidget(sketchOLabel,1,1,1,2); 
 
-		self.layout.addLayout(sliderLayout,16,0,2,2); 
+		self.layout.addLayout(sliderLayout,16,0,1,2); 
+
+		for i in range(0,16):
+			self.layout.setRowStretch(i,0.5); 
+		self.layout.setRowStretch(16,0.1);
 
 
 	def connectElements(self):
@@ -419,6 +457,7 @@ class SimulationWindow(QWidget):
 
 if __name__ == '__main__':
 
+	#configFile = 'reFogConfig.yaml'; 
 	configFile = 'config.yaml'; 
 
 	app = QApplication(sys.argv); 

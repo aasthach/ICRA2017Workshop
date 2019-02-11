@@ -24,7 +24,7 @@ __status__ = "Development"
 
 
 import julia; 
-
+import numpy as np
 
 class JuliaController():
 
@@ -66,6 +66,10 @@ class JuliaController():
 		act = self.getAct(diffs); 
 		#print(diffs,act); 
 		return act; 
+
+	
+	def getQuestionIndex(self):
+		return np.random.randint(0,len(self.model.sketches.keys())*5 + 5); 
 
 if __name__ == '__main__':
 	c = JuliaController(); 

@@ -84,7 +84,7 @@ class WGController():
 
 
 	def getQuestionIndex(self):
-		return np.random.randint(0,4); 
+		return np.random.randint(0,len(self.model.sketches.keys())*5 + 5); 
 
 if __name__ == '__main__':
 	a = 0; 
