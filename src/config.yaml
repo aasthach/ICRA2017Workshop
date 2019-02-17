@@ -23,7 +23,7 @@ Interface:
   controlType: "WMAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
-  numSketchPoints: 8
+  numSketchPoints: 6
 
   #Radius in pixels of drawn sketch points
   sketchDensity: 4
@@ -52,7 +52,12 @@ Interface:
   cheatTarget: True
 
   #Where to save the data, must end in ".npy"
-  dataSave: "../data/tmpInterfaceData.npy"
+  dataSave: "../data/tmpInterfaceData2.npy"
+
+  #Which file to load and play from
+  #None: Collect Data
+  replayFile: "../data/tmpInterfaceData.npy"
+  #replayFile: "None"
 
 ###Model Params
 Model:
@@ -83,10 +88,10 @@ Model:
   breadCrumbLength: 50
 
   #Which pre-generated belief to use, {1-10}
-  belNum: None
+  belNum: 1
 
   #Standard Deviation of target position in pixels
-  targetSpeed: 7
+  targetSpeed: 8
 
   #What governs the movement of the target? {"Stationary","Random","NCV"}
   targetMovementModel: "NCV"

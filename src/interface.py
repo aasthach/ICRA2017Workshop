@@ -54,6 +54,7 @@ from planeFunctions import *;
 from problemModel import Model
 from robotControllers import Controller; 
 from juliaController import JuliaController
+from juliaMAPController import JuliaMAPController 
 from weightedGreedyController import WGController
 
 
@@ -87,6 +88,11 @@ class SimulationWindow(QWidget):
 		# #self.SAVE_FILE = '../data/{}_bel{}_{}'.format(self.CONTROL_TYPE,beliefType,pushing,time.asctime().replace(' ','').replace(':','_')); 
 		# self.SAVE_FILE = None; 
 		self.DATA_SAVE = self.params['Interface']['dataSave']; 
+		self.REPLAY_FILE = self.params['Interface']['replayFile']; 
+		if(self.REPLAY_FILE != 'None'):
+			self.replayData = np.load(self.REPLAY_FILE).item(); 
+			self.timeStamp = 0; 
+			self.replayTime = len(self.replayData['CopPoses'])
 
 		self.runData = {'CopPoses':[],'RobPoses':[],'Sketches':[],'Beliefs':[],'PushObservations':[],'PullObservations':[]};
 		self.currentPush = None; 
@@ -167,12 +173,12 @@ class SimulationWindow(QWidget):
 
 	def collectAndSaveData(self):
 
-		cp = self.trueModel.copPose; 
-		rp = self.trueModel.robPose; 
-		bel = self.assumedModel.belief; 
-		sketch = self.currentSketch; 
-		push = self.currentPush; 
-		pull = self.currentPull; 
+		cp = deepcopy(self.trueModel.copPose); 
+		rp = deepcopy(self.trueModel.robPose); 
+		bel = deepcopy(self.assumedModel.belief); 
+		sketch = deepcopy(self.currentSketch); 
+		push = deepcopy(self.currentPush); 
+		pull = deepcopy(self.currentPull); 
 
 		#self.runData = {'CopPoses':[],'RobPoses':[],'Sketches':[],'Beliefs':[],'PushObservations':[],'PullObservations':[]};
 		self.runData['CopPoses'].append(cp); 
@@ -455,10 +461,11 @@ class SimulationWindow(QWidget):
 	def saveAllThings(self):
 		print("Saving Things"); 
 
+
 if __name__ == '__main__':
 
-	#configFile = 'reFogConfig.yaml'; 
-	configFile = 'config.yaml'; 
+	#configFile = 'config.yaml'; 
+	configFile = 'reFogConfig.yaml'; 
 
 	app = QApplication(sys.argv); 
 	ex = SimulationWindow(configFile); 

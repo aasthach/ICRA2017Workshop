@@ -211,7 +211,7 @@ class Model:
 				post.addG(g); 
 			else:
 				change = True; 
-				tmp = soft.lwisUpdate(g,0,100,inverse=True);
+				tmp = soft.lwisUpdate(g,0,200,inverse=True);
 				#self.bounds = {'low':[0,0],'high':[437,754]}
 				tmp.mean[0] = max(self.bounds['low'][0]+1,tmp.mean[0]); 
 				tmp.mean[1] = max(self.bounds['low'][1]+1,tmp.mean[1]); 

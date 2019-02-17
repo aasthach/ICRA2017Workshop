@@ -37,7 +37,7 @@ Interface:
   droneViewRadius: 175
 
   #How often, in Hz, the front end requests a control action, {0.00001-\inf}
-  controlFreq: 2
+  controlFreq: 1
 
   #Maximum Frequency the controller can ask questions, {0.00001 - \inf}
   questionFreq: 0.25
@@ -51,12 +51,20 @@ Interface:
   #For Debugging, Shows the Target location on the fog
   cheatTarget: False
 
+  #Where to save the data, must end in ".npy"
+  dataSave: "../data/tmpInterfaceData2.npy"
+
+  #Which file to load and play from
+  #None: Collect Data
+  #replayFile: "../data/tmpInterfaceData.npy"
+  replayFile: "None"
+
 ###Model Params
 Model:
   #If None, randomly chosen
   #Else: [0-437,0-754]
   copInitPose: None
-  targetInitPose: None
+  targetInitPose: [400,200]
 
   #Random Beliefs, if belNum is None, {1-40}
   numRandBel: 20
@@ -83,7 +91,7 @@ Model:
   belNum: None
 
   #Standard Deviation of target position in pixels
-  targetSpeed: 7
+  targetSpeed: 8
 
   #What governs the movement of the target? {"Stationary","Random","NCV"}
   targetMovementModel: "NCV"

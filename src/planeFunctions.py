@@ -32,7 +32,11 @@ def makeTruePlane(wind):
 	wind.imgWidth = wind.trueImage.size().width(); 
 	wind.imgHeight = wind.trueImage.size().height(); 
 
+	wind.originalTrue = wind.trueImage.toImage(); 
+
 	wind.truePlane = wind.imageScene.addPixmap(wind.trueImage); 
+
+
 
 
 def makeFogPlane(wind):
@@ -65,9 +69,19 @@ def defog(wind,points):
 
 def refog(wind,points):
 
+	dimmer = 35; 
 	for p in points:
-		c = wind.originalFog.pixel(p[0],p[1]); 
+		c = wind.originalTrue.pixel(p[0],p[1]); 
 		col = QColor(c)
+		ra = col.getRgb(); 
+		col.setRed(max(0,ra[0]-dimmer)); 
+		col.setGreen(max(0,ra[1]-dimmer)); 
+		col.setBlue(max(0,ra[2]-dimmer));  
+		# ra[0] = max(0,ra[0]-dimmer); 
+		# ra[1] = max(0,ra[1]-dimmer); 
+		# ra[2] = max(0,ra[2]-dimmer); 
+		# ra[3] = 255
+
 		wind.fogImage.setPixelColor(p[0],p[1],col); 
 	wind.fogPlane.setPixmap(QPixmap.fromImage(wind.fogImage));
 

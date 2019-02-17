@@ -136,11 +136,46 @@ def moveRobot(wind,eventKey=None):
 				speed = nomSpeed + delta; 
 			wind.trueModel.copPose[0] = wind.trueModel.copPose[0] + speed;
 
+	# if(wind.REPLAY_FILE != 'None'):
+	# 	print(wind.trueModel.copPose,wind.replayData['CopPoses'][wind.timeStamp])
+	# 	wind.trueModel.copPose = wind.replayData['CopPoses'][wind.timeStamp]; 
+		
+
 	wind.assumedModel.copPose = wind.trueModel.copPose;
 	wind.assumedModel.prevPoses = wind.trueModel.prevPoses; 
 
 	wind.trueModel.stateDynamicsUpdate(); 
 	wind.assumedModel.stateDynamicsUpdate(); 
+
+
+	if(wind.REPLAY_FILE != 'None' and wind.timeStamp < wind.replayTime):
+		#Fix Robber Pose
+		wind.trueModel.robPose = wind.replayData['RobPoses'][wind.timeStamp]; 
+
+		#Introduce Sketches
+		if(wind.replayData['Sketches'][wind.timeStamp] is not None):
+			wind.allSketchPaths.append(wind.replayData['Sketches'][wind.timeStamp][1]); 
+			name = wind.replayData['Sketches'][wind.timeStamp][0]; 
+			if(name not in wind.allSketchPlanes.keys()):
+				wind.allSketchPlanes[name] = wind.imageScene.addPixmap(makeTransparentPlane(wind));
+				wind.objectsDrop.addItem(name);
+				wind.allSketchNames.append(name); 
+			else:
+				planeFlushPaint(wind.allSketchPlanes[name],[]);
+
+			wind.currentSketch = [name,wind.allSketchPaths[-1]]; 
+			wind.allSketches[name] = wind.allSketchPaths[-1]; 
+			wind.sketchListen = False; 
+			wind.sketchingInProgress = False; 
+			makeModel(wind,name);
+
+		#Give Push Obs
+		if(wind.replayData['PushObservations'][wind.timeStamp] is not None):
+			[name,rel,pos] = wind.replayData['PushObservations'][wind.timeStamp];
+			wind.assumedModel.stateObsUpdate(name,rel,pos); 
+
+		wind.timeStamp += 1; 
+
 
 	# if(not wind.sketchingInProgress):
 	movementViewChanges(wind);
@@ -208,6 +243,7 @@ def paintTargetEnd(wind):
 
 def checkEndCondition(wind):
 	if(distance(wind.trueModel.copPose,wind.trueModel.robPose) < wind.trueModel.ROBOT_CATCH_RADIUS):
+		wind.collectAndSaveData(); 
 		np.save(wind.DATA_SAVE,wind.runData); 
 		wind.TARGET_STATUS = 'captured'
 		print('End Condition Reached'); 
