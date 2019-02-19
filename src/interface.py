@@ -53,8 +53,10 @@ from interfaceFunctions import *;
 from planeFunctions import *;
 from problemModel import Model
 from robotControllers import Controller; 
-from juliaController import JuliaController
+
+
 from juliaMAPController import JuliaMAPController 
+from juliaPOMCPController import JuliaPOMCPController
 from weightedGreedyController import WGController
 
 
@@ -99,10 +101,14 @@ class SimulationWindow(QWidget):
 		self.currentPull = None; 
 		self.currentSketch = None; 
 
+		self.latestPushForUpdate = [0,0,0,0,0]; 
+
 
 		#Make Models
-		self.trueModel = Model(self.params,trueModel=True);
 		self.assumedModel = Model(self.params,trueModel=False); 
+		self.trueModel = Model(self.params,trueModel=True);
+		self.assumedModel.copPose = self.trueModel.copPose; 
+
 		self.TARGET_STATUS = 'loose'; 
 
 		self.makeBreadCrumbColors(); 
@@ -134,12 +140,13 @@ class SimulationWindow(QWidget):
 		self.QUESTION_FREQUENCY = self.params['Interface']['questionFreq']; #Hz
 		
 		if(self.CONTROL_TYPE == "MAP"):
-			self.control = Controller(self.assumedModel); 
+			#print("Control Type Map")
+			self.control = JuliaMAPController(self.assumedModel); 
 		elif(self.CONTROL_TYPE == 'WMAP'):
 			self.control = WGController(self.assumedModel); 
 		elif(self.CONTROL_TYPE == "POMCP"):		
 			#self.control = sp.Popen(['python','-u','juliaBridge.py'],stdin = sp.PIPE,stdout = sp.PIPE,stderr=sp.STDOUT)
-			self.control = JuliaController(self.assumedModel); 
+			self.control = JuliaPOMCPController(self.assumedModel); 
 
 		self.prevFogPoints = []; 
 

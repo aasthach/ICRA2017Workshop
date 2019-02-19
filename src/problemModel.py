@@ -43,6 +43,7 @@ class Model:
 		if(self.copPose == 'None'):
 			self.copPose = [np.random.randint(0,437),np.random.randint(0,754)]; 
 
+		#print("Python Cop Pose: {}".format(self.copPose))
 
 		self.ROBOT_VIEW_RADIUS = params['Model']['robotViewRadius']; 
 		self.ROBOT_CATCH_RADIUS = params['Model']['robotCatchRadius']; 
@@ -68,9 +69,24 @@ class Model:
 
 				for i in range(0,self.MAX_BELIEF_SIZE):
 					self.belief.addNewG([np.random.randint(0,437),np.random.randint(0,754)],[[4000+500*np.random.normal(),0],[0,4000+500*np.random.normal()]],np.sqrt(np.random.random())); 
-				self.belief.normalizeWeights(); 
+				self.belief.normalizeWeights();
+
+				low = [0,0]; 
+				high = [437,754]; 
+				res = 100; 
+				x, y = np.mgrid[low[0]:high[0]:(float(high[0]-low[0])/res), low[1]:high[1]:(float(high[1]-low[1])/res)]
+				c = np.ones(shape=(437,754))/(437*754);
+				self.particleBelief = [x,y,c]; 
+
 			else:
 				self.belief = np.load("../models/beliefs{}.npy".format(belModel))[0]
+
+				low = [0,0]; 
+				high = [437,754]; 
+				res = 100; 
+				x, y = np.mgrid[low[0]:high[0]:(float(high[0]-low[0])/res), low[1]:high[1]:(float(high[1]-low[1])/res)]
+				c = np.ones(shape=(437,754))/(437*754);
+				self.particleBelief = [x,y,c]; 
 
 
 		self.robPose = params['Model']['targetInitPose'];
@@ -93,6 +109,8 @@ class Model:
 
 		self.sketches = {};
 		self.sketchParams = {}; 
+		self.sketchOrder = []; 
+		self.sketchNameOrder = []; 
 
 		self.prevPoses = []; 
 
@@ -154,6 +172,8 @@ class Model:
 			cent[3] = max(cent[3],np.abs(vertices[i][1]-cent[1]))
 
 		self.sketchParams[name] = cent; 
+		self.sketchOrder.append(cent); 
+		self.sketchNameOrder.append(name); 
 
 
 

@@ -20,7 +20,7 @@ Interface:
   #MAP: Takes shortest route to point of highest belief
   #WMAP: Weights belief peaks by their distance
   #POMCP: Calls JuliaPOMCP
-  controlType: "WMAP"
+  controlType: "MAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
   numSketchPoints: 6

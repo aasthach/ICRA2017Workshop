@@ -28,8 +28,9 @@ from julia import Main
 import numpy as np
 
 import matplotlib.pyplot as plt
+import multiprocessing
 
-class JuliaMAPController():
+class JuliaPOMCPController():
 
 
 	def __init__(self,model=None):
@@ -39,11 +40,11 @@ class JuliaMAPController():
 
 
 
-		j.include("PushMAP.jl"); 
+		j.include("PushPOMCP.jl"); 
 		self.getAct = j.eval("getAct"); 
 		self.create = j.eval("create"); 
-		self.addModel = j.eval("addModel"); 
-		self.juliaRecreate = j.eval("recreate"); 
+		self.addModel = j.eval("addModel");
+		self.juliaRecreate = j.eval("recreate");  
 
 		try:
 			cp = self.model.copPose;
@@ -62,23 +63,24 @@ class JuliaMAPController():
 		print("Models: {}".format(self.model.sketchOrder)); 
 
 
+
 	def getActionKey(self,obs):
 
 		#print(self.model.copPose); 
-
 
 		cp = self.model.copPose; 
 		rp = self.model.robPose; 
 		
 		if(np.sqrt((cp[0]-rp[0])**2 + (cp[1]-rp[1])**2) < 25):
 			obs[4] = 2; 
-		elif(np.sqrt((cp[0]-rp[0])**2 + (cp[1]-rp[1])**2) < 50):
+		elif(np.sqrt((cp[0]-rp[0])**2 + (cp[1]-rp[1])**2) < 100):
 			obs[4] = 1; 		
 
 		print(obs); 
 
 
 		act = self.getAct(obs); 
+
 		bel = Main.parseBel;
 
 		parts = np.array(bel); 
@@ -109,10 +111,11 @@ class JuliaMAPController():
 		for i in range(0,100):
 			#obs = int(np.random.choice([0,1],p=[.9,.1])); 
 			#print(obs); 
-			obs = 0; 
-			if(np.sqrt((pose[0]-pose[2])**2 + (pose[1]-pose[3])**2) < 25):
-				obs = 1; 
+			#obs = 0; 
+			#if(np.sqrt((pose[0]-pose[2])**2 + (pose[1]-pose[3])**2) < 25):
+				#obs = 1; 
 
+			obs = [0,0,0,0,0]
 			act = self.getAct(obs); 
 			bel = Main.parseBel;
 			#print(act); 
@@ -128,7 +131,7 @@ class JuliaMAPController():
 			pose[2] = np.random.normal(pose[2],8)
 			pose[3] = np.random.normal(pose[3],8); 
 
-			print(pose); 
+			print("Pose: {}".format(pose)); 
 			print(moves[act]); 
 			print(""); 
 
@@ -162,6 +165,6 @@ class JuliaMAPController():
 
 
 if __name__ == '__main__':
-	c = JuliaMAPController(); 
+	c = JuliaPOMCPController(); 
 	#print(c.getActionKey()); 
 	c.testJulia(); 

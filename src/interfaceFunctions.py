@@ -44,12 +44,14 @@ from copy import copy,deepcopy
 #Converts a gaussian mixture belief to an image in the belief tab
 def makeBeliefMap(wind):
 
-	[x,y,c] = wind.assumedModel.belief.plot2D(low=[0,0],high=[wind.imgWidth,wind.imgHeight],vis=False);
+	#[x,y,c] = wind.assumedModel.belief.plot2D(low=[0,0],high=[wind.imgWidth,wind.imgHeight],vis=False);
+	[x,y,c] = wind.assumedModel.particleBelief; 
 	sp = SubplotParams(left=0.,bottom=0.,right=1.,top=1.); 
 	fig = Figure(subplotpars=sp); 
 	canvas = FigureCanvas(fig); 
 	ax = fig.add_subplot(111); 
 	ax.contourf(np.transpose(c),cmap='viridis',alpha=1); 
+	#ax.contourf(c,cmap='viridis',alpha=1); 
 	ax.invert_yaxis(); 
 	ax.set_axis_off(); 
 
@@ -142,10 +144,11 @@ def moveRobot(wind,eventKey=None):
 		
 
 	wind.assumedModel.copPose = wind.trueModel.copPose;
+	wind.assumedModel.robPose = wind.trueModel.robPose
 	wind.assumedModel.prevPoses = wind.trueModel.prevPoses; 
 
 	wind.trueModel.stateDynamicsUpdate(); 
-	wind.assumedModel.stateDynamicsUpdate(); 
+	#wind.assumedModel.stateDynamicsUpdate(); 
 
 
 	if(wind.REPLAY_FILE != 'None' and wind.timeStamp < wind.replayTime):
@@ -174,6 +177,7 @@ def moveRobot(wind,eventKey=None):
 			[name,rel,pos] = wind.replayData['PushObservations'][wind.timeStamp];
 			wind.assumedModel.stateObsUpdate(name,rel,pos); 
 
+
 		wind.timeStamp += 1; 
 
 
@@ -186,7 +190,7 @@ def moveRobot(wind,eventKey=None):
 	if(len(wind.assumedModel.prevPoses) > 1):
 		change = False
 
-		change = wind.assumedModel.stateLWISUpdate(); 
+		#change = wind.assumedModel.stateLWISUpdate(); 
 		if(change):
 			a = 0; 
 			#wind.tabs.removeTab(0); 
@@ -478,6 +482,7 @@ def makeModel(wind,name):
 	wind.allSketchPlanes[name].setPixmap(pm); 
 
 	wind.assumedModel.makeSketch(vertices,name);
+	wind.control.recreate(); 
 
 	loadQuestions(wind); 
 
@@ -583,12 +588,17 @@ def controlTimerTimeout(wind):
 	if(wind.TARGET_STATUS == 'loose'):
 		if(not wind.sketchingInProgress):
 			wind.collectAndSaveData(); 
-			moveRobot(wind,arrowEvents[wind.control.getActionKey()]);
+			moveRobot(wind,arrowEvents[wind.control.getActionKey(wind.latestPushForUpdate)]);
+			wind.latestPushForUpdate = [0,0,0,0,0]; 
+
+
+
+
 
 
 def questionTimerTimeout(wind):
 	wind.questionIndex = wind.control.getQuestionIndex(); 
-	setRobotPullQuestion(wind); 
+	#setRobotPullQuestion(wind); 
 
 
 def findMixtureParams(mixture):
@@ -754,7 +764,19 @@ def pushButtonPressed(wind):
 	pos = str(wind.positivityDrop.currentText());
 
 	wind.currentPush = [name,rel,pos]; 
-	wind.assumedModel.stateObsUpdate(name,rel,pos); 
+	#wind.assumedModel.stateObsUpdate(name,rel,pos); 
+
+
+	#classes: 0:Near, 1:East, 2:South, 3:West, 4:North
+	spatialRealtions = {'Near':0,'South of':2,'West of':1,'North of':4,'East of':3}; 
+	posRelations = {'Is':1,'Is not':0}
+
+	try:
+		nameOrder = wind.assumedModel.sketchNameOrder.index(name)+1; 
+	except:
+		nameOrder = 0; 
+	obs = [1,nameOrder,spatialRealtions[rel],posRelations[pos],0]; 
+	wind.latestPushForUpdate = obs;
 
 	#makeBeliefMap(wind); 
 	# wind.tabs.removeTab(0); 

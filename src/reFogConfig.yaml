@@ -20,7 +20,7 @@ Interface:
   #MAP: Takes shortest route to point of highest belief
   #WMAP: Weights belief peaks by their distance
   #POMCP: Calls JuliaPOMCP
-  controlType: "WMAP"
+  controlType: "MAP"
 
   #Number of points to retain in polygon fitting, {3-\inf}
   numSketchPoints: 8
@@ -49,7 +49,7 @@ Interface:
   refogCop: True
 
   #For Debugging, Shows the Target location on the fog
-  cheatTarget: False
+  cheatTarget: True
 
   #Where to save the data, must end in ".npy"
   dataSave: "../data/tmpInterfaceData2.npy"
@@ -57,13 +57,13 @@ Interface:
   #Which file to load and play from
   #None: Collect Data
   #replayFile: "../data/tmpInterfaceData.npy"
-  replayFile: "None"
+  replayFile: None
 
 ###Model Params
 Model:
   #If None, randomly chosen
   #Else: [0-437,0-754]
-  copInitPose: None
+  copInitPose: [200,500]
   targetInitPose: [400,200]
 
   #Random Beliefs, if belNum is None, {1-40}
@@ -94,4 +94,4 @@ Model:
   targetSpeed: 8
 
   #What governs the movement of the target? {"Stationary","Random","NCV"}
-  targetMovementModel: "NCV"
+  targetMovementModel: "Random"

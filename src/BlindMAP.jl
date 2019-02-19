@@ -25,16 +25,15 @@ mutable struct MAP_Blind_POMDP <: POMDPs.POMDP{Vector{Float64},Int,Int}
 end
 
 
-
+global robotViewRadius
 
 ##########TODO###############
-function initialstate_distribution(pomdp::MAP_Blind_POMDP)
+function initialstate_distribution(pomdp::MAP_Blind_POMDP,s::Vector{Int64})
 
 	numMixands = 5000; 
-	copPose = [200,200]
 	mixands = MvNormal[]; 
 	for i=1:numMixands
-		tmp = MvNormal([copPose[1],copPose[2],rand(10:427),rand(10:744)],[0.01,0.01,rand(5:10),rand(5:10)])
+		tmp = MvNormal([s[1],s[2],rand(10:427),rand(10:744)],[0.01,0.01,rand(5:10),rand(5:10)])
 		push!(mixands,tmp); 
 	end
 
@@ -45,7 +44,9 @@ end
 
 function generate_o(::MAP_Blind_POMDP, s::Vector{Float64}, a::Int64, sp::Vector{Float64}, rng::AbstractRNG)
 
-	if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < 25
+	global robotViewRadius
+
+	if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < robotViewRadius
 		return 1; 
 	else
 		return 0; 
@@ -57,17 +58,19 @@ end
 
 function obs_weight(::MAP_Blind_POMDP, s::Vector{Float64}, a::Int64, sp::Vector{Float64}, o::Int64)
 
+	global robotViewRadius
+
 	if o==1
-		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < 25
-			return .9; 
+		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < robotViewRadius
+			return .95; 
 		else
-			return .1; 
+			return .05; 
 		end
 	else
-		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < 25
-			return .1; 
+		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < robotViewRadius
+			return .05; 
 		else
-			return .9; 
+			return .95; 
 		end
 
 	end
@@ -77,33 +80,34 @@ end
 
 
 function generate_s(p::MAP_Blind_POMDP, s::Vector{Float64}, a::Int, rng::AbstractRNG)
-	sig_0 = [sqrt(0.00001),sqrt(0.00001),1.,1.]
-	#sig_stationary = [sqrt(0.00001),sqrt(0.00001)]
+	sig_0 = [1.,1.,8.,8.]
+
 	d= MvNormal(sig_0)
     noise = rand(d::MvNormal) 
 
+    noise[1] = 0; 
+    noise[2] = 0; 
 
-    if a == 0
+    if a == 2
         s= s + [-10.,0.,0.,0.] + noise
-    elseif a == 1
-        s= s + [10.,0.,0.,0.] + noise
-    elseif a == 2
-    	s= s + [0.,10.,0.,0.] + noise
     elseif a == 3
+        s= s + [10.,0.,0.,0.] + noise
+    elseif a == 1
+    	s= s + [0.,10.,0.,0.] + noise
+    elseif a == 0
     	s= s + [0.,-10.,0.,0.] + noise
     else 
     	s= s + noise
     end
 
-
-    s[1] = max(0,s[1])
-    s[1] = min(437,s[1]); 
-    s[2] = max(0,s[2])
-    s[2] = min(754,s[2]);
-    s[3] = max(0,s[3])
-    s[3] = min(437,s[3]); 
-    s[4] = max(0,s[4])
-    s[4] = min(754,s[4]);
+    #s[1] = max(0,s[1])
+    #s[1] = min(437,s[1]); 
+    #s[2] = max(0,s[2])
+    #s[2] = min(754,s[2]);
+    #s[3] = max(0,s[3])
+    #s[3] = min(437,s[3]); 
+    #s[4] = max(0,s[4])
+    #s[4] = min(754,s[4]);
 
     return s   
     
@@ -135,68 +139,79 @@ global planner
 global bel
 global parseBel
 global action
+global objectModels
 
-function create()
+objectModels = Any[]
+
+
+
+function create(copPose::Vector{Int64})
 	
 	global pomdp
 	global up
 	global solver
 	global planner
 	global bel
+	global robotViewRadius
 
+	robotViewRadius = 50; 
 
+	#println("copPose"); 
+	#println(copPose); 
 
 	discount(p::MAP_Blind_POMDP) = p.discount_factor
-	actions(::MAP_Blind_POMDP) = [0,1,2,3,4]
+	actions(::MAP_Blind_POMDP) = [0,1,2,3]
 	n_actions(p::MAP_Blind_POMDP) = length(actions(p))
 
 
 	pomdp = MAP_Blind_POMDP(); 
-	b0 = initialstate_distribution(pomdp);
+	b0 = initialstate_distribution(pomdp,copPose);
 
 
 	N = 100000; 
 	RNG = MersenneTwister(1)
 	up = SIRParticleFilter(pomdp,N,RNG);
 	bel = initialize_belief(up,b0); 
+	#println(mode(bel))
 
-	solver = POMCPSolver(tree_queries=1000, c=10.0, rng=RNG)
+	solver = POMCPSolver(max_time=1, c=10.0,max_depth=1000)
 	planner = solve(solver,pomdp); 
 
 end
 
 
 
-function getAct(o::Int64)
+function getAct(o::Vector{Int64})
 
 	global bel
 	global action
 	
 	MAP = mode(bel); 
 	#VOI(bel); 
-	#println(MAP)
+	println(MAP)
+
 
 	#left/right or up/down
 	if abs(MAP[1]-MAP[3]) > abs(MAP[2]-MAP[4])
 
 		#left or right
 		if MAP[1] > MAP[3]
-			action=0
+			action=2
 		else
-			action=1
+			action=3
 		end
 
 	else
 
 		#up or down
 		if MAP[2] > MAP[4]
-			action=3
+			action=0
 		else
-			action=2
+			action=1
 		end
 	end
 
-	newBel,u = update_info(up,bel,action,o)
+	newBel,u = update_info(up,bel,action,o[5])
 	bel = newBel
 	
 
@@ -221,11 +236,21 @@ function pythonifyBel(bel)
 end
 
 
+function addModel(a::Any)
+	
+	global objectModels
+
+	push!(objectModels,a); 
+
+
+end
+
 
 function VOI(bel)
 
 	global up
-
+	global robotViewRadius
+	
 	action = 0; 
 
 
@@ -235,7 +260,7 @@ function VOI(bel)
 	VOINO = 0; 
 	for i in 1:n_particles(belNo)
 		s = particle(belNo,i); 
-		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < 25
+		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < robotViewRadius
 			VOINO += 5; 
 		end
 	end
@@ -243,7 +268,7 @@ function VOI(bel)
 	VOIYes = 0; 
 	for i in 1:n_particles(belYes)
 		s = particle(belYes,i); 
-		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < 25
+		if sqrt((s[1]-s[3])*(s[1]-s[3]) + (s[2]-s[4])*(s[2]-s[4])) < robotViewRadius
 			VOIYes += 5; 
 		end
 	end
